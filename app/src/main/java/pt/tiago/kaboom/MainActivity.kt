@@ -27,10 +27,13 @@ import androidx.core.view.WindowInsetsControllerCompat
 import pt.tiago.kaboom.audio.Feedback
 import androidx.activity.compose.BackHandler
 import pt.tiago.kaboom.ui.GameScreen
+import pt.tiago.kaboom.ui.LevelSelectScreen
 import pt.tiago.kaboom.ui.Settings
 import pt.tiago.kaboom.ui.SettingsScreen
 import pt.tiago.kaboom.ui.TitleScreen
 import pt.tiago.kaboom.ui.Ui
+
+private enum class Screen { TITLE, SELECT, GAME }
 
 class MainActivity : ComponentActivity() {
     private lateinit var feedback: Feedback
@@ -45,7 +48,10 @@ class MainActivity : ComponentActivity() {
         feedback = Feedback(this)
 
         setContent {
-            var playing by remember { mutableStateOf(false) }
+            var screen by remember { mutableStateOf(Screen.TITLE) }
+            var startLevel by remember { mutableIntStateOf(1) }
+            // Nível mais alto que se pode escolher (Levels.count + 1 = modo infinito)
+            var unlocked by remember { mutableIntStateOf(prefs.getInt("unlocked", 1)) }
             var best by remember { mutableIntStateOf(prefs.getInt("best", 0)) }
             var bestLevel by remember { mutableIntStateOf(prefs.getInt("bestLevel", 0)) }
             var showSettings by remember { mutableStateOf(false) }
@@ -64,8 +70,9 @@ class MainActivity : ComponentActivity() {
                         .background(Ui.Night)
                         .windowInsetsPadding(WindowInsets.safeDrawing),
                 ) {
-                    if (playing) {
-                        GameScreen(
+                    when (screen) {
+                        Screen.GAME -> GameScreen(
+                            startLevel = startLevel,
                             feedback = feedback,
                             settings = settings,
                             onSettingsChange = changeSettings,
@@ -77,10 +84,28 @@ class MainActivity : ComponentActivity() {
                                     putInt("bestLevel", bestLevel)
                                 }
                             },
-                            onExit = { playing = false },
+                            onLevelCleared = { level ->
+                                if (level + 1 > unlocked) {
+                                    unlocked = level + 1
+                                    prefs.edit { putInt("unlocked", unlocked) }
+                                }
+                            },
+                            onExit = { screen = Screen.SELECT },
                         )
-                    } else {
-                        TitleScreen(best, bestLevel, onSettings = { showSettings = true }, onPlay = { playing = true })
+                        Screen.SELECT -> {
+                            BackHandler { screen = Screen.TITLE }
+                            LevelSelectScreen(
+                                unlocked = unlocked,
+                                onPick = { n ->
+                                    startLevel = n
+                                    screen = Screen.GAME
+                                },
+                                onBack = { screen = Screen.TITLE },
+                            )
+                        }
+                        Screen.TITLE -> TitleScreen(best, bestLevel, onSettings = { showSettings = true }, onPlay = { screen = Screen.SELECT })
+                    }
+                    if (screen != Screen.GAME) {
                         if (showSettings) {
                             BackHandler { showSettings = false }
                             SettingsScreen(

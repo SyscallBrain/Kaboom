@@ -237,7 +237,7 @@ class GameTest {
     fun niveisGeradosSaoJogaveis() {
         repeat(30) { seed ->
             val g = Game(Random(seed))
-            g.newGame()
+            g.newGame(Levels.count + 1) // depois dos desenhados à mão vêm os gerados
             // Zona de partida livre para pôr a primeira bomba e fugir
             for ((x, y) in listOf(1 to 1, 2 to 1, 1 to 2)) assertEquals(Tile.FLOOR, g.tiles[y][x])
             // Porta escondida debaixo de um bloco e inimigos longe do jogador

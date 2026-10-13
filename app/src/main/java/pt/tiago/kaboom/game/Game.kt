@@ -54,6 +54,9 @@ class Game(private val rng: Random = Random.Default) {
     val enemies = ArrayList<Enemy>()
     var player = Player(); private set
     var level = 1; private set
+
+    /** Nome do nível desenhado à mão, ou null no modo infinito (níveis gerados). */
+    var levelName: String? = null; private set
     var lives = START_LIVES; private set
     var score = 0; private set
     var phase = Phase.START; private set
@@ -69,12 +72,14 @@ class Game(private val rng: Random = Random.Default) {
 
     val doorOpen get() = enemies.none { it.alive }
 
-    fun newGame() {
-        level = 1
+    fun newGame(startLevel: Int = 1) {
         lives = START_LIVES
         score = 0
-        player = Player()
-        loadLevel(1)
+        player = Player().apply {
+            maxBombs = Levels.startBombs(startLevel)
+            range = Levels.startRange(startLevel)
+        }
+        loadLevel(startLevel)
     }
 
     fun requestBomb() {
@@ -143,9 +148,37 @@ class Game(private val rng: Random = Random.Default) {
     private fun loadLevel(n: Int) {
         level = n
         resetBoard()
-        generate(n)
+        val def = Levels.get(n)
+        levelName = def?.name
+        if (def != null) loadDesigned(def) else generate(n)
         doorWasOpen = doorOpen
         setPhase(Phase.START)
+    }
+
+    private fun loadDesigned(def: LevelDef) {
+        for ((y, row) in def.rows.withIndex()) for ((x, c) in row.withIndex()) {
+            tiles[y][x] = when (c) {
+                '#' -> Tile.WALL
+                'B', 'D', 'b', 'f', 's' -> Tile.BLOCK
+                else -> Tile.FLOOR
+            }
+            when (c) {
+                'P' -> {
+                    player.x = x + 0.5f
+                    player.y = y + 0.5f
+                }
+                'D' -> {
+                    doorX = x
+                    doorY = y
+                }
+                'b' -> hiddenItems[y * W + x] = ItemType.BOMB
+                'f' -> hiddenItems[y * W + x] = ItemType.FIRE
+                's' -> hiddenItems[y * W + x] = ItemType.SPEED
+                'E' -> enemies += Enemy(EnemyKind.BLOB, x, y)
+                'Y' -> enemies += Enemy(EnemyKind.EYE, x, y)
+                'G' -> enemies += Enemy(EnemyKind.GHOST, x, y)
+            }
+        }
     }
 
     private fun generate(n: Int) {

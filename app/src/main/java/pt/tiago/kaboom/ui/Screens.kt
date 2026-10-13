@@ -55,6 +55,7 @@ import pt.tiago.kaboom.game.Dir
 import pt.tiago.kaboom.game.Game
 import pt.tiago.kaboom.game.GameEvent
 import pt.tiago.kaboom.game.ItemType
+import pt.tiago.kaboom.game.Levels
 import pt.tiago.kaboom.game.Phase
 import pt.tiago.kaboom.ui.pixel.Art
 import pt.tiago.kaboom.ui.pixel.PixelFont
@@ -206,13 +207,15 @@ private fun Legend(img: ImageBitmap, text: String) {
 
 @Composable
 fun GameScreen(
+    startLevel: Int,
     feedback: Feedback,
     settings: Settings,
     onSettingsChange: (Settings) -> Unit,
     onGameOver: (score: Int, level: Int) -> Unit,
+    onLevelCleared: (level: Int) -> Unit,
     onExit: () -> Unit,
 ) {
-    val game = remember { Game().apply { newGame() } }
+    val game = remember { Game().apply { newGame(startLevel) } }
     val effects = remember { Effects() }
     val measurer = rememberTextMeasurer()
     var frame by remember { mutableLongStateOf(0L) }
@@ -234,6 +237,7 @@ fun GameScreen(
                     game.update(dt)
                     for (e in game.events) feedback.on(e)
                     if (GameEvent.GAME_OVER in game.events) onGameOver(game.score, game.level)
+                    if (GameEvent.LEVEL_CLEAR in game.events) onLevelCleared(game.level)
                     game.events.clear()
                     effects.consume(game.fx)
                     game.fx.clear()
@@ -290,10 +294,10 @@ fun GameScreen(
                 Spacer(Modifier.height(32.dp))
                 PixelButton("OUTRA VEZ", Modifier.width(260.dp), primary = true) {
                     effects.clear()
-                    game.newGame()
+                    game.newGame(startLevel)
                 }
                 Spacer(Modifier.height(14.dp))
-                PixelButton("MENU", Modifier.width(260.dp), onClick = onExit)
+                PixelButton("ESCOLHER NÍVEL", Modifier.width(260.dp), onClick = onExit)
             }
         } else if (paused) {
             Overlay {
@@ -303,7 +307,7 @@ fun GameScreen(
                 Spacer(Modifier.height(14.dp))
                 PixelButton("DEFINIÇÕES", Modifier.width(260.dp)) { showSettings = true }
                 Spacer(Modifier.height(14.dp))
-                PixelButton("SAIR PARA O MENU", Modifier.width(260.dp), onClick = onExit)
+                PixelButton("ESCOLHER NÍVEL", Modifier.width(260.dp), onClick = onExit)
             }
         }
         if (showSettings) {
@@ -360,7 +364,8 @@ private data class HudState(val lives: Int, val level: Int, val bombs: Int, val 
 
 /** Título e subtítulo do aviso a mostrar por cima do mapa, ou null se não houver. */
 private fun bannerFor(game: Game): Pair<String, String>? = when {
-    game.phase == Phase.START -> "NÍVEL ${game.level}" to "PREPARA-TE!"
+    game.phase == Phase.START -> "NÍVEL ${game.level}" to (game.levelName ?: "MODO INFINITO")
+    game.phase == Phase.LEVEL_CLEAR && game.level == Levels.count -> "VITÓRIA!" to "MUNDO 1 CONCLUÍDO"
     game.phase == Phase.LEVEL_CLEAR -> "CONCLUÍDO!" to "+${500 + 100 * game.level} PONTOS"
     game.phase == Phase.PLAYING && game.time - game.doorOpenedAt < 2.2f -> "PORTA ABERTA!" to "ENCONTRA A SAÍDA"
     else -> null
