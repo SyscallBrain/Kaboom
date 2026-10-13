@@ -225,7 +225,7 @@ private fun Legend(img: ImageBitmap, text: String) {
 // ------------------------------------------------------------------ jogo
 
 /** Altura mínima da zona dos comandos por baixo do tabuleiro. */
-private val MIN_CONTROLS = 200.dp
+private val MIN_CONTROLS = 160.dp
 
 @Composable
 fun GameScreen(
@@ -307,7 +307,7 @@ fun GameScreen(
                         Canvas(Modifier.fillMaxSize().clipToBounds()) {
                             @Suppress("UNUSED_EXPRESSION") frame // redesenha a cada frame
                             val b = BoardLayout(size.width, k)
-                            val ox = b.originX(game.player.x)
+                            val ox = b.ox
                             // O tremor anda em passos de píxel de arte, para não "desfocar" a pixel art
                             val sh = effects.shakeOffset()
                             val sx = (sh.x * ART).roundToInt() * k

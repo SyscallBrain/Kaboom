@@ -15,7 +15,7 @@ class Game(private val rng: Random = Random.Default) {
 
     companion object {
         const val W = 13
-        const val H = 15
+        const val H = 19
         const val FUSE = 2.6f
         const val FLAME = 0.6f
         const val BURN = 0.55f
