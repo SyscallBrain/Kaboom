@@ -22,6 +22,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import pt.tiago.kaboom.game.Dir
+import pt.tiago.kaboom.game.ItemType
 import pt.tiago.kaboom.ui.pixel.Art
 import kotlin.math.abs
 
@@ -43,11 +44,15 @@ fun Controls(
     modifier: Modifier,
     scheme: ControlScheme,
     leftHanded: Boolean,
+    showDetonate: Boolean,
     onDir: (Dir?) -> Unit,
     onBomb: () -> Unit,
+    onDetonate: () -> Unit,
 ) {
     val dirCb by rememberUpdatedState(onDir)
     val bombCb by rememberUpdatedState(onBomb)
+    val detonateCb by rememberUpdatedState(onDetonate)
+    val detonateNow by rememberUpdatedState(showDetonate)
     val schemeNow by rememberUpdatedState(scheme)
     val leftNow by rememberUpdatedState(leftHanded)
     val density = LocalDensity.current
@@ -59,11 +64,13 @@ fun Controls(
     var knob by remember { mutableStateOf<Offset?>(null) }   // relativo ao centro
     var active by remember { mutableStateOf<Dir?>(null) }
     var bombDown by remember { mutableStateOf(false) }
+    var detonateDown by remember { mutableStateOf(false) }
 
     Canvas(
         modifier.pointerInput(Unit) {
             awaitPointerEventScope {
                 val isPad = HashMap<PointerId, Boolean>()
+                val isDetonate = HashSet<PointerId>()
                 while (true) {
                     val ev = awaitPointerEvent()
                     val split = size.width * 0.5f
@@ -71,13 +78,23 @@ fun Controls(
                         if (c.changedToDown()) {
                             val pad = (c.position.x < split) != leftNow
                             isPad[c.id] = pad
-                            if (!pad) bombCb()
+                            val det = detonateCenter(size.width.toFloat(), size.height.toFloat(), bombR, leftNow)
+                            if (!pad && detonateNow && (c.position - det).getDistance() < bombR * 0.95f) {
+                                isDetonate += c.id
+                                detonateCb()
+                            } else if (!pad) {
+                                bombCb()
+                            }
                             if (pad && schemeNow == ControlScheme.FLOATING) origin = c.position
                         }
-                        if (!c.pressed) isPad.remove(c.id)
+                        if (!c.pressed) {
+                            isPad.remove(c.id)
+                            isDetonate.remove(c.id)
+                        }
                         c.consume()
                     }
-                    bombDown = ev.changes.any { it.pressed && isPad[it.id] == false }
+                    bombDown = ev.changes.any { it.pressed && isPad[it.id] == false && it.id !in isDetonate }
+                    detonateDown = ev.changes.any { it.pressed && it.id in isDetonate }
                     val finger = ev.changes.firstOrNull { it.pressed && isPad[it.id] == true }
 
                     val newDir = if (finger == null) {
@@ -131,7 +148,24 @@ fun Controls(
         }
         val bombX = if (leftHanded) bombR * 1.6f else size.width - bombR * 1.6f
         drawBombButton(Offset(bombX, size.height * 0.55f), bombR, bombDown)
+        if (showDetonate) drawDetonateButton(detonateCenter(size.width, size.height, bombR, leftHanded), bombR * 0.62f, detonateDown)
     }
+}
+
+/** Botão do detonador: acima do da bomba, puxado para o meio do ecrã. */
+private fun detonateCenter(w: Float, h: Float, bombR: Float, leftHanded: Boolean): Offset {
+    val bombX = if (leftHanded) bombR * 1.6f else w - bombR * 1.6f
+    return Offset(bombX + (if (leftHanded) 1 else -1) * bombR * 0.9f, h * 0.55f - bombR * 1.9f)
+}
+
+private fun DrawScope.drawDetonateButton(c: Offset, r: Float, down: Boolean) {
+    val press = if (down) 0.9f else 1f
+    drawCircle(Color.Black.copy(alpha = 0.4f), r, c + Offset(0f, r * 0.1f))
+    drawCircle(if (down) Color(0xFF5A2A90) else Color(0xFF8A4AD0), r * press, c)
+    drawCircle(Color.White.copy(alpha = 0.25f), r * press, c, style = Stroke(r * 0.06f))
+    val k = (r * 1.3f / 12f).toInt().coerceAtLeast(1)
+    val img = Art.icon(ItemType.REMOTE)
+    sprite(img, (c.x - img.width * k / 2f).toInt(), (c.y - img.height * k / 2f).toInt(), k, scale = press)
 }
 
 private fun padCenter(w: Float, h: Float, r: Float, leftHanded: Boolean) =

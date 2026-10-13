@@ -26,6 +26,8 @@ private val Brick = Color(0xFFC8582A)
 private val Mortar = Color(0xFF6E2614)
 private val Gold = Color(0xFFFFCF3A)
 private val Smoke = Color(0xFF8E8AA6)
+private val Magic = Color(0xFF9A6CFF)
+private val Shield = Color(0xFF7FE8FF)
 
 /**
  * Efeitos só visuais (partículas, pontos a flutuar, tremor do ecrã). Ficam fora da lógica
@@ -86,6 +88,19 @@ class Effects {
                 parts += Particle(f.x, f.y, cos(a) * 2.6f, sin(a) * 2.6f, 0.45f, if (i % 2 == 0) Color.White else Gold, 0.07f, 0f, false)
             }
             FxKind.SCORE -> popups += Popup(f.x, f.y, "+${f.value}")
+            FxKind.TELEPORT -> repeat(14) {
+                burst(f, speed = 1.5f + rnd.nextFloat() * 2f, life = 0.5f, color = if (rnd.nextBoolean()) Magic else Color.White, size = 0.08f, gravity = -2f, square = true)
+            }
+            FxKind.SHIELD_BREAK -> {
+                shake = min(shake + 0.2f, 0.6f)
+                repeat(16) { burst(f, speed = 3f + rnd.nextFloat() * 2f, life = 0.5f, color = if (rnd.nextBoolean()) Shield else Color.White, size = 0.1f, gravity = 6f, square = true) }
+            }
+            FxKind.HURT -> repeat(10) {
+                burst(f, speed = 2.5f, life = 0.35f, color = Color.White, size = 0.08f, gravity = 0f, square = true)
+            }
+            FxKind.KICK -> repeat(6) {
+                burst(f, speed = 1.2f, life = 0.4f, color = Smoke, size = 0.1f, gravity = -1f, square = true)
+            }
         }
     }
 

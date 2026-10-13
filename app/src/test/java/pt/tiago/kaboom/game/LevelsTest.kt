@@ -14,12 +14,12 @@ class LevelsTest {
 
     @Test
     fun tamanhoEBordas() {
-        for ((i, def) in Levels.world1.withIndex()) {
+        for ((i, def) in Levels.all.withIndex()) {
             val n = "nível ${i + 1} (${def.name})"
             assertEquals("$n: linhas", Game.H, def.rows.size)
             def.rows.forEachIndexed { y, row ->
                 assertEquals("$n linha $y: '$row'", Game.W, row.length)
-                assertTrue("$n linha $y: caracteres desconhecidos em '$row'", row.all { it in "#.BPDbfsEYG" })
+                assertTrue("$n linha $y: caracteres desconhecidos em '$row'", row.all { it in "#.BPDbfskrhplEYGCNM" })
             }
             for (x in 0 until Game.W) {
                 assertEquals("$n: borda de cima", '#', def.rows[0][x])
@@ -34,20 +34,20 @@ class LevelsTest {
 
     @Test
     fun umJogadorUmaPortaEInimigos() {
-        for ((i, def) in Levels.world1.withIndex()) {
+        for ((i, def) in Levels.all.withIndex()) {
             val n = "nível ${i + 1}"
             assertEquals("$n: um 'P'", 1, cells(def, "P").size)
             assertEquals("$n: uma 'D'", 1, cells(def, "D").size)
-            assertTrue("$n: tem inimigos", cells(def, "EYG").isNotEmpty())
-            assertTrue("$n: tem poderes", cells(def, "bfs").size >= 2)
+            assertTrue("$n: tem inimigos", cells(def, "EYGCNM").isNotEmpty())
+            assertTrue("$n: tem poderes", cells(def, "bfskrhpl").size >= 2)
         }
     }
 
     @Test
     fun inimigosComecamLonge() {
-        for ((i, def) in Levels.world1.withIndex()) {
+        for ((i, def) in Levels.all.withIndex()) {
             val (px, py) = cells(def, "P").single()
-            for ((ex, ey) in cells(def, "EYG")) {
+            for ((ex, ey) in cells(def, "EYGCNM")) {
                 assertTrue("nível ${i + 1}: inimigo em ($ex,$ey) perto demais", abs(ex - px) + abs(ey - py) >= 5)
             }
         }
@@ -56,10 +56,10 @@ class LevelsTest {
     @Test
     fun chegaSeATodoOLado() {
         // Rebentando tijolos, todas as casas que não são parede têm de estar ligadas ao início.
-        for ((i, def) in Levels.world1.withIndex()) {
+        for ((i, def) in Levels.all.withIndex()) {
             val start = cells(def, "P").single()
             val seen = flood(def, start) { it != '#' }
-            val open = cells(def, ".BPDbfsEYG")
+            val open = cells(def, ".BPDbfskrhplEYGCNM")
             val lost = open.filter { it !in seen }
             assertTrue("nível ${i + 1}: casas isoladas $lost", lost.isEmpty())
         }
@@ -67,12 +67,12 @@ class LevelsTest {
 
     @Test
     fun haSempreParaOndeFugirDaPrimeiraBomba() {
-        for ((i, def) in Levels.world1.withIndex()) {
+        for ((i, def) in Levels.all.withIndex()) {
             val n = i + 1
             val (px, py) = cells(def, "P").single()
             val range = Levels.startRange(n)
             // Casas que se alcançam sem partir tijolos
-            val walk = flood(def, px to py) { it in ".PEYG" }
+            val walk = flood(def, px to py) { it in ".PEYGCNM" }
             val safe = walk.any { (x, y) ->
                 val inLine = (x == px && abs(y - py) <= range) || (y == py && abs(x - px) <= range)
                 !inLine
@@ -91,8 +91,8 @@ class LevelsTest {
         assertEquals(dx, g.doorX)
         assertEquals(dy, g.doorY)
         assertEquals(Tile.BLOCK, g.tiles[dy][dx])
-        assertEquals(cells(def, "EYG").size, g.enemies.size)
-        assertEquals(cells(def, "bfs").size, g.hiddenItems.size)
+        assertEquals(cells(def, "EYGCNM").size, g.enemies.size)
+        assertEquals(cells(def, "bfskrhpl").size, g.hiddenItems.size)
         assertEquals(1.5f, g.player.x)
     }
 
@@ -102,6 +102,18 @@ class LevelsTest {
         g.newGame(Levels.count + 1)
         assertEquals(null, g.levelName)
         assertTrue(g.enemies.isNotEmpty())
+    }
+
+    @Test
+    fun quatroMundosDeOitoNiveis() {
+        assertEquals(4, Levels.worlds.size)
+        Levels.worlds.forEach { assertEquals(it.name, Levels.PER_WORLD, it.levels.size) }
+        assertEquals("1-1", Levels.label(1))
+        assertEquals("2-3", Levels.label(11))
+        assertEquals("4-8", Levels.label(32))
+        assertEquals("∞1", Levels.label(33))
+        assertTrue(Levels.isWorldEnd(16))
+        assertEquals("24 é o último do mundo 3 (índice 2)", 2, Levels.worldOf(24))
     }
 
     @Test

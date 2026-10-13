@@ -1,14 +1,20 @@
 package pt.tiago.kaboom.game
 
+import kotlin.math.min
+
 /**
  * Nível desenhado à mão. Legenda dos mapas (13 colunas × 15 linhas):
  *
  * - `#` parede · `.` chão · `B` tijolo · `P` início do jogador
  * - `D` porta escondida debaixo de um tijolo
- * - `b` `f` `s` tijolo com poder escondido: bomba, fogo, rapidez
- * - `E` gota · `Y` morcego · `G` fantasma
+ * - tijolo com poder escondido: `b` bomba · `f` fogo · `s` rapidez · `k` chutar ·
+ *   `r` detonador · `h` escudo · `p` fogo perfurante · `l` vida extra
+ * - inimigos: `E` gota · `Y` morcego · `G` fantasma · `C` cobra · `N` boneco de neve · `M` mago
  */
 class LevelDef(val name: String, val rows: List<String>)
+
+/** Um mundo: 8 níveis com o mesmo cenário. */
+class World(val name: String, val levels: List<LevelDef>)
 
 object Levels {
     val world1 = listOf(
@@ -174,15 +180,522 @@ object Levels {
         ),
     )
 
-    val count get() = world1.size
+    val world2 = listOf(
+        LevelDef(
+            "AREIAS QUENTES",
+            listOf(
+                "#############",
+                "#P..B.k.B...#",
+                "#.#.#B#.#B#.#",
+                "#B..B...B..E#",
+                "#.#B#.#B#.#.#",
+                "#..B..B...B.#",
+                "#B#.#.#.#B#B#",
+                "#.B..f..B...#",
+                "#.#B#.#B#.#.#",
+                "#E...B...B..#",
+                "#B#.#B#.#.#B#",
+                "#..B...D..B.#",
+                "#.#.#B#.#B#.#",
+                "#.B..E..b..C#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "COBRAS!",
+            listOf(
+                "#############",
+                "#P...B...B.C#",
+                "#.#.#.#B#.#.#",
+                "#..B...B..B.#",
+                "#B#.#B#.#.#.#",
+                "#.B...k..B..#",
+                "#.#B#.#.#B#B#",
+                "#C...B.B...C#",
+                "#.#.#B#.#.#.#",
+                "#..B..f..B..#",
+                "#B#.#.#B#.#B#",
+                "#..B.D...B..#",
+                "#.#B#.#.#B#.#",
+                "#E..B..b..E.#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "OÁSIS",
+            listOf(
+                "#############",
+                "#P..B...B..Y#",
+                "#.#.#B#B#.#.#",
+                "#..B.....B..#",
+                "#B#.#BBB#.#B#",
+                "#..BB...BB..#",
+                "#.#B..C..B#.#",
+                "#..B..D..B..#",
+                "#.#B..C..B#.#",
+                "#..BB...BB..#",
+                "#B#.#BhB#.#B#",
+                "#..B..f..B..#",
+                "#.#.#B#B#.#.#",
+                "#E..B...B..E#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "TEMPESTADE DE AREIA",
+            listOf(
+                "#############",
+                "#P..BBB.BBB.#",
+                "#.#.#B#B#B#Y#",
+                "#BB.B.B.B.BB#",
+                "#B#B#.#.#B#B#",
+                "#.BB.BYB.BB.#",
+                "#B#.#B#B#.#B#",
+                "#.B.B.b.B.B.#",
+                "#B#.#B#B#.#B#",
+                "#.BB.BDB.BB.#",
+                "#B#B#.#.#B#B#",
+                "#BB.B.k.B.BB#",
+                "#.#B#B#B#B#.#",
+                "#C.BBf.hBB.C#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "AS PIRÂMIDES",
+            listOf(
+                "#############",
+                "#P...B.B...C#",
+                "#.#.#.#.#.#.#",
+                "#..B..#..B..#",
+                "#.#..###..#.#",
+                "#B..#####..B#",
+                "#.#.......#.#",
+                "#..B.B.B.B..#",
+                "#.#.......#.#",
+                "#B..#####..B#",
+                "#.#..#D#..#.#",
+                "#..B..s..B..#",
+                "#.#.#B#B#.#.#",
+                "#Y..B.l.B..E#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "MIRAGEM",
+            listOf(
+                "#############",
+                "#P..B...B..G#",
+                "#.#.#B#.#B#.#",
+                "#..BB.B.BB..#",
+                "#B#.#.#.#.#B#",
+                "#..B..C..B..#",
+                "#.#B#B#B#B#.#",
+                "#B.B.BfB.B.B#",
+                "#.#B#B#B#B#.#",
+                "#..B..D..B..#",
+                "#B#.#.#.#.#B#",
+                "#..BB.B.BB..#",
+                "#.#.#B#.#B#.#",
+                "#G..B.k.B..C#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "VENTO SECO",
+            listOf(
+                "#############",
+                "#P.B..B..B.C#",
+                "#.#########.#",
+                "#..B..b..B..#",
+                "#.#.#####.#.#",
+                "#.C.B...B..C#",
+                "#.###.#.###.#",
+                "#...B.D.B...#",
+                "#.###.#.###.#",
+                "#Y..B...B..Y#",
+                "#.#.#####.#.#",
+                "#..B..h..B..#",
+                "#.#########.#",
+                "#E.B..f..B.E#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "O GRANDE DESERTO",
+            listOf(
+                "#############",
+                "#P..BB.BB.C.#",
+                "#.#B#.#.#B#.#",
+                "#..B.BBB.B.Y#",
+                "#B#.#.#.#.#B#",
+                "#.BB.BCB.BB.#",
+                "#.#B#B#B#B#.#",
+                "#Y.B.BlB.B.C#",
+                "#.#B#B#B#B#.#",
+                "#.BB.BDB.BB.#",
+                "#B#.#.#.#.#B#",
+                "#..B.BkB.B..#",
+                "#.#B#.#.#B#.#",
+                "#C..BB.BBh.E#",
+                "#############",
+            ),
+        ),
+    )
+
+    val world3 = listOf(
+        LevelDef(
+            "NEVE FRESCA",
+            listOf(
+                "#############",
+                "#P..B.r.B...#",
+                "#.#.#B#.#B#.#",
+                "#B..B...B..N#",
+                "#.#B#.#B#.#.#",
+                "#..B..B...B.#",
+                "#B#.#.#.#B#B#",
+                "#.B..f..B...#",
+                "#.#B#.#B#.#.#",
+                "#N...B...B..#",
+                "#B#.#B#.#.#B#",
+                "#..B...D..B.#",
+                "#.#.#B#.#B#.#",
+                "#.B..E..b..N#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "LAGO GELADO",
+            listOf(
+                "#############",
+                "#P..B.B.B..N#",
+                "#.#.#.#.#B#.#",
+                "#.B.......B.#",
+                "#B#.......#B#",
+                "#.B..N.N..B.#",
+                "#B#.......#B#",
+                "#.B...D...B.#",
+                "#B#.......#B#",
+                "#.B..Y.Y..B.#",
+                "#B#.......#B#",
+                "#.B.......B.#",
+                "#.#B#.#.#B#.#",
+                "#E..B.rf.B..#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "CAVERNA DE GELO",
+            listOf(
+                "#############",
+                "#P..#...B..Y#",
+                "#.#.#.#.#.#.#",
+                "#...B.#...#.#",
+                "###.#.###.#.#",
+                "#.N.#...B...#",
+                "#.###.#.#####",
+                "#.....#..r..#",
+                "#.#####.###.#",
+                "#...B.#...#N#",
+                "#.#.#.###.#.#",
+                "#.#...#D..#.#",
+                "#.#.#.#.#.#.#",
+                "#E..B...b...#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "AVALANCHE",
+            listOf(
+                "#############",
+                "#P..BBBBB..G#",
+                "#.#.#B#B#B#.#",
+                "#..BB.B.BBBB#",
+                "#B#B#B#.#B#.#",
+                "#BB.BBNBB.BB#",
+                "#.#B#.#B#.#B#",
+                "#B.BBhB.BB.B#",
+                "#B#.#B#.#B#.#",
+                "#.BB.BBDB.BB#",
+                "#B#B#.#B#B#B#",
+                "#BB.BBG.BBfB#",
+                "#.#B#B#B#.#B#",
+                "#N.BB.bBB.EG#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "PICOS GELADOS",
+            listOf(
+                "#############",
+                "#P....B....N#",
+                "#.#.B.#.B.#.#",
+                "#..#.....#..#",
+                "#.B.#.B.#.B.#",
+                "#....#.#....#",
+                "#.#.B...B.#.#",
+                "#..r..#..D..#",
+                "#.#.B...B.#.#",
+                "#....#N#....#",
+                "#.B.#.B.#.B.#",
+                "#..#.....#..#",
+                "#.#.B.#.B.#.#",
+                "#Y...fB.b..N#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "IGLU",
+            listOf(
+                "#############",
+                "#P..B...B..Y#",
+                "#.#.#B#B#.#.#",
+                "#..B.....B..#",
+                "#.#.#####.#.#",
+                "#B..#...#..B#",
+                "#.#B#.N.#B#.#",
+                "#..B#.D.#B..#",
+                "#.#B##.##B#.#",
+                "#B...B.B...B#",
+                "#.#.#.#.#.#.#",
+                "#..B.r.N.B..#",
+                "#.#B#.#.#B#.#",
+                "#E..B.h.B..N#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "TUNDRA",
+            listOf(
+                "#############",
+                "#P.B.....B..#",
+                "#.#.#B#B#.#.#",
+                "#..B....GB.B#",
+                "#.#.#.#.#.#.#",
+                "#..B.BYB.B..#",
+                "#B#B#.#.#B#B#",
+                "#N.....D....#",
+                "#B#B#.#.#B#B#",
+                "#..B.BrB.B..#",
+                "#.#.#.#.#.#.#",
+                "#B.B..h..B.B#",
+                "#.#.#B#B#.#.#",
+                "#..B..Y..B.N#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "REI DO GELO",
+            listOf(
+                "#############",
+                "#P..BB.BBN..#",
+                "#.#.#B#.#B#.#",
+                "#..BB.B.BBBY#",
+                "#B#.#B#B#.#B#",
+                "#.BBN.B.NBB.#",
+                "#.#B#B#B#B#.#",
+                "#G.B.BDB.B.G#",
+                "#.#B#B#B#B#.#",
+                "#.BBN.B.NBB.#",
+                "#B#.#B#B#.#B#",
+                "#Y.BBrBlBB..#",
+                "#.#.#B#B#.#.#",
+                "#E..BBhBB..N#",
+                "#############",
+            ),
+        ),
+    )
+
+    val world4 = listOf(
+        LevelDef(
+            "PORTÃO DO CASTELO",
+            listOf(
+                "#############",
+                "#P....B....M#",
+                "#.#B#.#.#B#.#",
+                "#..B..p..B..#",
+                "#####B#B#####",
+                "#...B.....B.#",
+                "#.#.#.#.#.#.#",
+                "#M.B..D..B.E#",
+                "#.#.#.#.#.#.#",
+                "#.B.......B.#",
+                "#####B#B#####",
+                "#..B..f..B..#",
+                "#.#B#.#.#B#.#",
+                "#Y..B.b.B..M#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "SALÃO DE ARMAS",
+            listOf(
+                "#############",
+                "#P..B.#.B..M#",
+                "#.#.#.#.#.#.#",
+                "#..B..#..B..#",
+                "#B#.#.B.#.#B#",
+                "#...B.f.B...#",
+                "###.###.###.#",
+                "#.B...D...B.#",
+                "#.###.###.###",
+                "#...B.G.B...#",
+                "#B#.#.B.#.#B#",
+                "#..B..#..B..#",
+                "#.#.#.#.#.#.#",
+                "#E.kB.#.B.MY#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "MASMORRA",
+            listOf(
+                "#############",
+                "#P..#.....#M#",
+                "#.#.#.###.#.#",
+                "#.#...#.B...#",
+                "#.#####.#####",
+                "#...B.#.....#",
+                "###.#.#.###.#",
+                "#.M.#.D.#...#",
+                "#.###.#.#.###",
+                "#...B.#.B..Y#",
+                "#.#.#######.#",
+                "#.#....p....#",
+                "#.#.#####.#.#",
+                "#E..B..f..#M#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "TORRES",
+            listOf(
+                "#############",
+                "#P..B...B..M#",
+                "#.###.#.###.#",
+                "#.###B.B###.#",
+                "#.###.#.###.#",
+                "#..B..G..B..#",
+                "#.#.#B#B#.#.#",
+                "#B.B..D..B.B#",
+                "#.#.#B#B#.#.#",
+                "#..B..E..B..#",
+                "#.###.#.###.#",
+                "#.###B.B###.#",
+                "#.###.#.###.#",
+                "#Y..B.hk.B.M#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "SALA DO TRONO",
+            listOf(
+                "#############",
+                "#P..BB.BB..M#",
+                "#.#B#.#.#B#.#",
+                "#..B.BBB.B..#",
+                "#B#.#####.#B#",
+                "#.B.#...#.B.#",
+                "#B#.#.M.#.#B#",
+                "#..B#.D.#B..#",
+                "#B#.##.##.#B#",
+                "#.B...B...B.#",
+                "#B#.#B#B#.#B#",
+                "#..BB.p.BB..#",
+                "#.#.#B#B#.#.#",
+                "#Y.B..l..B.G#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "PONTE LEVADIÇA",
+            listOf(
+                "#############",
+                "#P..B.B.B..M#",
+                "#.#.#.#.#.#.#",
+                "#B.B..B..B.B#",
+                "#.#B#.#.#B#.#",
+                "#..B..f..B..#",
+                "######B######",
+                "#..B..E..B..#",
+                "#.#B#.#.#B#.#",
+                "#M.B..D..B.M#",
+                "#.#.#.#.#.#.#",
+                "#B..B.k.B..B#",
+                "#.#B#.#.#B#.#",
+                "#G..B...B..Y#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "CATACUMBAS",
+            listOf(
+                "#############",
+                "#P..BBBBB..G#",
+                "#.#.#B#B#B#.#",
+                "#..BB.B.BBBB#",
+                "#B#B#B#.#B#.#",
+                "#BB.MB.BB.BB#",
+                "#.#B#.#B#.#B#",
+                "#B.BBpB.BB.B#",
+                "#B#.#B#.#B#.#",
+                "#.BB.BBDBG.B#",
+                "#B#B#.#B#B#B#",
+                "#BB.BBG.BBfB#",
+                "#.#B#B#B#.#B#",
+                "#M.BB.lBB.EG#",
+                "#############",
+            ),
+        ),
+        LevelDef(
+            "O MAGO SUPREMO",
+            listOf(
+                "#############",
+                "#P..B.B.B..M#",
+                "#.#.#B#B#.#.#",
+                "#..BB...BB..#",
+                "#B#.#B#B#.#B#",
+                "#.B.B.M.B.B.#",
+                "#.#B#.#.#B#.#",
+                "#Y.B.BDB.B.Y#",
+                "#.#B#.#.#B#.#",
+                "#.B.B.N.B.B.#",
+                "#B#.#B#B#.#B#",
+                "#..BB.l.BB..#",
+                "#.#.#B#B#.#.#",
+                "#G..C.p.C..G#",
+                "#############",
+            ),
+        ),
+    )
+
+    val worlds = listOf(
+        World("O PRADO", world1),
+        World("O DESERTO", world2),
+        World("O GELO", world3),
+        World("O CASTELO", world4),
+    )
+
+    val all = worlds.flatMap { it.levels }
+    val count get() = all.size
+    const val PER_WORLD = 8
 
     /** Nível desenhado número [n] (a partir de 1), ou null se já for o modo infinito. */
-    fun get(n: Int): LevelDef? = world1.getOrNull(n - 1)
+    fun get(n: Int): LevelDef? = all.getOrNull(n - 1)
+
+    /** Mundo (0..3) do nível [n]; no modo infinito os cenários vão rodando a cada 3 níveis. */
+    fun worldOf(n: Int): Int = if (n <= count) (n - 1) / PER_WORLD else ((n - count - 1) / 3) % worlds.size
+
+    /** "2-3" para o 3.º nível do mundo 2; "∞5" para o 5.º nível do modo infinito. */
+    fun label(n: Int): String = if (n <= count) "${(n - 1) / PER_WORLD + 1}-${(n - 1) % PER_WORLD + 1}" else "∞${n - count}"
+
+    /** Último nível de um mundo: vitória! */
+    fun isWorldEnd(n: Int) = n <= count && n % PER_WORLD == 0
 
     /**
      * Poderes com que se começa ao escolher um nível no menu: quem salta para o
      * nível 7 não pode começar com 1 bomba de alcance 1.
      */
-    fun startBombs(n: Int) = 1 + (n - 1) / 3
-    fun startRange(n: Int) = 1 + (n - 1) / 3
+    fun startBombs(n: Int) = min(1 + (n - 1) / 4, 6)
+    fun startRange(n: Int) = min(1 + (n - 1) / 4, 6)
 }

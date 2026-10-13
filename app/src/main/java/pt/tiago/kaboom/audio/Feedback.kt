@@ -71,6 +71,7 @@ class Feedback(context: Context) {
         val base = when (e) {
             GameEvent.EXPLOSION -> 50L
             GameEvent.PLAYER_DIED -> 300L
+            GameEvent.SHIELD_BREAK -> 120L
             else -> return
         }
         // Força = amplitude (se o telemóvel a suportar) e duração.

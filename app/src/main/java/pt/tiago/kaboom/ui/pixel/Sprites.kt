@@ -79,6 +79,41 @@ object Sprites {
         ".kGGgGGggGGgGGk.", ".kGkkGGkkGGkkGk.", "..k..kk..kk..k..", "................",
     )
 
+    val snake1 = listOf(
+        "................", "......kkkk......", ".....kAAAAk.....", "....kAeAAeAk....",
+        "....kAAAAAAk....", ".....kAArAk.....", "......kAAk......", "......kAAk......",
+        ".....kAAAk......", "...kkAAAk.kkk...", "..kAAAAk.kAAAk..", ".kAATTAAkAATTAk.",
+        ".kATTTTAAATTTAk.", "..kAAAAAAAAAAk..", "...kkkkkkkkkk...", "................",
+    )
+    val snake2 = snake1.toMutableList().also {
+        it[5] = ".....kAAAAk....."
+        it[11] = ".kATTAAAkAATTAk."
+        it[12] = ".kAATTTAATTTAAk."
+    }.toList()
+
+    val snowman = listOf(
+        ".....kkkkkk.....", ".....kDDDDk.....", "....kkDDDDkk....", ".....kIIIIk.....",
+        "....kIeIIeIk....", "....kIIFFIJk....", ".....kRRRRk.....", "....kRRRRRRk....",
+        "...kIIIdIIIJk...", "..kIIIIIIIIJJk..", "..kIIIIdIIIJJk..", "..kIIIIIIIIJJk..",
+        "..kJIIIIIIJJJk..", "...kJJJJJJJJk...", "....kkkkkkkk....", "................",
+    )
+
+    /** Depois da primeira explosão: sem chapéu, mais pequeno (e mais rápido). */
+    val snowmanSmall = listOf(
+        "................", "................", "................", "................",
+        "................", "................", ".....kkkkkk.....", "....kIeIIeIk....",
+        "....kIIFFIJk....", "....kRRRRRRk....", "...kIIIIIIIJk...", "...kIIIdIIIJk...",
+        "...kJIIIIIJJk...", "....kJJJJJJk....", ".....kkkkkk.....", "................",
+    )
+
+    val wizard1 = listOf(
+        "........k.......", ".......kvk......", "......kvvQk.....", ".....kvvvvvk....",
+        "....kVVVVVVVk...", ".....kseesk.k7k.", ".....kwwwwk..o..", "....kvwwwwvk.o..",
+        "...kvvvvvvvvks..", "...kvvvvvvvvko..", "..kVvvvvvVk.o...", "..kVVvvvvVVk.o..",
+        "..kVVVVVVVVk.o..", "...kkkkkkkk..o..", "...kook.kook.o..", "...kkk..kkk..k..",
+    )
+    val wizard2 = wizard1.map { it.replace('7', 'Q') }
+
     // ------------------------------------------------------------ bomba
     val bomb1 = listOf(
         "..........Q.....", ".........QFQ....", "..........f.....", ".........f......",
@@ -88,9 +123,25 @@ object Sprites {
     )
     val bomb2 = listOf("..........F.....", ".........FQF....") + bomb1.drop(2)
 
+    /** Bomba do detonador: antena com luz a piscar em vez de rastilho. */
+    val bombRemote1 = listOf(".........r......", ".........k......", ".........k......", ".........k......") + bomb1.drop(4)
+    val bombRemote2 = listOf(".........q......") + bombRemote1.drop(1)
+
+    /** Bolha do escudo à volta do herói. */
+    val shieldBubble: List<String> = (0 until 16).map { y ->
+        (0 until 16).map { x ->
+            val d = hypot(x - 7.5, y - 7.5)
+            when {
+                x in 3..4 && y in 3..4 -> 'w'
+                d in 6.6..7.6 -> 'Z'
+                else -> '.'
+            }
+        }.joinToString("")
+    }
+
     /** A piscar a vermelho quando está quase a rebentar. */
-    val bombHot1 = bomb1.map { it.replace('d', 'R').replace('D', 'C') }
-    val bombHot2 = bomb2.map { it.replace('d', 'R').replace('D', 'C') }
+    val bombHot1 = bomb1.map { it.replace('d', 'R').replace('D', 'q') }
+    val bombHot2 = bomb2.map { it.replace('d', 'R').replace('D', 'q') }
 
     // ------------------------------------------------------------ cenário
     val brick = listOf(
@@ -114,6 +165,15 @@ object Sprites {
 
     /** Mesma relva num tom diferente, para o xadrez do chão. */
     val floor2 = floor.map { it.replace('1', '4') }
+
+    /** Lajes de pedra (castelo). */
+    val floorStone = listOf(
+        "3333333233333333", "1111111211111111", "1111111211111111", "1111111211111111",
+        "1111111211111111", "1111111211111111", "1111111211111111", "2222222222222222",
+        "3332333333333333", "1112111111111111", "1112111111111111", "1112111111111111",
+        "1112111111111111", "1112111111111111", "1112111111111111", "2222222222222222",
+    )
+    val floorStone2 = floorStone.map { it.replace('1', '4') }
 
     val door = listOf(
         "....kkkkkkkk....", "..kkMMMMMMMMkk..", ".kMMkkkkkkkkMMk.", ".kMkooooooookMk.",
@@ -210,6 +270,21 @@ object Sprites {
         ".....QQQ..", "....QQQ...", "...QQQ....", "..QQQQQQ..", "....QQQ...",
         "...QQQ....", "..QQQ.....", ".QQ.......", "Q.........", "..........",
     )
+    val iconKick = listOf(
+        "..........", "..kkkk....", "..kook....", "..kook....", "..kook....",
+        "..koookk..", "..kooooook", ".kooooooo.", ".kwwwwwwwk", "..kkkkkkk.",
+    )
+    val iconRemote = listOf(
+        "....Q.....", "....k.....", "....k.....", "..kkkkkk..", "..kddddk..",
+        "..kdRRdk..", "..kdRRdk..", "..kddddk..", "..kddddk..", "..kkkkkk..",
+    )
+    val iconShield = listOf(
+        ".kkkkkkkk.", ".k776666k.", ".k766666k.", ".k666666k.", ".k666666k.",
+        ".k666666k.", "..k6666k..", "..k6666k..", "...k66k...", "....kk....",
+    )
+
+    /** Fogo azul: o fogo perfurante. */
+    val iconPierce = iconFire.map { it.replace('F', '6').replace('Q', '7') }
     val iconHeart = listOf(
         "..........", ".kk...kk..", "krrk.krrk.", "krwrkrrrk.", "krrrrrrrk.",
         ".krrrrrk..", "..krrrk...", "...krk....", "....k.....", "..........",
@@ -219,6 +294,11 @@ object Sprites {
         ItemType.BOMB -> iconBomb
         ItemType.FIRE -> iconFire
         ItemType.SPEED -> iconSpeed
+        ItemType.KICK -> iconKick
+        ItemType.REMOTE -> iconRemote
+        ItemType.SHIELD -> iconShield
+        ItemType.PIERCE -> iconPierce
+        ItemType.LIFE -> iconHeart
     }
 
     /** Ícone com contorno de 1 píxel, numa grelha 12×12 (para a barra de cima). */
@@ -238,6 +318,11 @@ object Sprites {
             ItemType.FIRE -> 'R'
             ItemType.BOMB -> 'U'
             ItemType.SPEED -> 'N'
+            ItemType.KICK -> 'K'
+            ItemType.REMOTE -> 'X'
+            ItemType.SHIELD -> 'H'
+            ItemType.PIERCE -> 'W'
+            ItemType.LIFE -> 'L'
         }
         val g = Array(16) { y ->
             CharArray(16) { x ->

@@ -30,6 +30,17 @@ class SpritesTest {
         for (f in 0 until 4) put("poof$f", Sprites.poof(f))
         for (k in Sprites.FlameKind.entries) for (p in 0..2) put("flame$k$p", Sprites.flame(k, p))
         for (t in ItemType.entries) put("item$t", Sprites.item(t))
+        put("snake1", Sprites.snake1)
+        put("snake2", Sprites.snake2)
+        put("snowman", Sprites.snowman)
+        put("snowmanSmall", Sprites.snowmanSmall)
+        put("wizard1", Sprites.wizard1)
+        put("wizard2", Sprites.wizard2)
+        put("bombRemote1", Sprites.bombRemote1)
+        put("bombRemote2", Sprites.bombRemote2)
+        put("shieldBubble", Sprites.shieldBubble)
+        put("floorStone", Sprites.floorStone)
+        put("floorStone2", Sprites.floorStone2)
     }
 
     @Test
@@ -41,8 +52,16 @@ class SpritesTest {
     }
 
     @Test
+    fun cenariosTemCoresParaTudo() {
+        for (theme in Palette.Theme.entries) for ((name, g) in all16()) {
+            // Não pode rebentar: todas as letras têm cor em todos os cenários
+            Palette.rasterize(g, theme = theme).also { assertEquals("$name/$theme", 256, it.size) }
+        }
+    }
+
+    @Test
     fun iconesTem10x10() {
-        for (icon in listOf(Sprites.iconBomb, Sprites.iconFire, Sprites.iconSpeed, Sprites.iconHeart)) {
+        for (icon in ItemType.entries.map { Sprites.iconFor(it) }) {
             assertEquals(10, icon.size)
             icon.forEach { assertEquals("'$it'", 10, it.length) }
         }

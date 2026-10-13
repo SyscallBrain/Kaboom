@@ -20,27 +20,65 @@ object Palette {
         '1' to 0x3aa64a, '2' to 0x2b8a3e, '3' to 0x6fd06a, '4' to 0x349a44,
         'R' to 0xe0402a, 'U' to 0x3a6df0, 'N' to 0x2fa84a,
         '5' to 0x14204a, '6' to 0x2f8cff, '7' to 0xc8f4ff,
+        // cobra, boneco de neve, fundos dos poderes novos, bolha do escudo
+        'A' to 0x6ccf4a, 'T' to 0x2f7d2a, 'I' to 0xf4f8ff, 'J' to 0xa9c4e8,
+        'K' to 0xe08a2a, 'X' to 0x8a4ad0, 'H' to 0x2fb8c8, 'W' to 0xb0307a, 'L' to 0xff9ac8,
+        'Z' to 0x7fe8ff, 'q' to 0x8a1c14,
     )
+
+    /**
+     * Cenários: cada mundo troca só as cores do chão (1-4), das paredes (m n M)
+     * e dos tijolos (h c C). As personagens nunca usam estas letras.
+     */
+    enum class Theme(val overrides: Map<Char, Int>) {
+        MEADOW(emptyMap()),
+        DESERT(
+            mapOf(
+                '1' to 0xe3c07a, '2' to 0xcfa660, '3' to 0xf2d89a, '4' to 0xdbb66c,
+                'm' to 0xc08a58, 'n' to 0xe6b682, 'M' to 0x7e5232,
+                'h' to 0xe8a060, 'c' to 0xc06a30, 'C' to 0x6a3414,
+            ),
+        ),
+        ICE(
+            mapOf(
+                '1' to 0xe6f2ff, '2' to 0xc9def5, '3' to 0xffffff, '4' to 0xd9e9fb,
+                'm' to 0x6fa8dc, 'n' to 0xb8dcff, 'M' to 0x3d6fa8,
+                'h' to 0xc4f0ff, 'c' to 0x7fcbe8, 'C' to 0x3a7aa8,
+            ),
+        ),
+        CASTLE(
+            mapOf(
+                '1' to 0x6e6a80, '2' to 0x5e5a70, '3' to 0x85819a, '4' to 0x66627a,
+                'm' to 0x4a4560, 'n' to 0x7a7594, 'M' to 0x2a2640,
+                'h' to 0xc99a5a, 'c' to 0x9a6a36, 'C' to 0x4e3018,
+            ),
+        ),
+    }
 
     private val neighbours = listOf(0 to -1, -1 to 0, 1 to 0, 0 to 1, -1 to -1, 1 to -1, -1 to 1, 1 to 1)
 
     /** Converte uma grelha em píxeis ARGB. [white] = silhueta branca (para o piscar ao morrer). */
-    fun rasterize(grid: List<String>, white: Boolean = false): IntArray {
+    fun rasterize(grid: List<String>, white: Boolean = false, theme: Theme = Theme.MEADOW): IntArray {
+        fun color(ch: Char) = theme.overrides[ch] ?: colors.getValue(ch)
         val h = grid.size
         val w = grid[0].length
         val out = IntArray(w * h)
         for (y in 0 until h) for (x in 0 until w) {
             val ch = grid[y][x]
             if (ch == '.') continue
-            var rgb = colors.getValue(ch)
+            var rgb = color(ch)
             if (ch == 'k') {
                 val near = neighbours.firstNotNullOfOrNull { (dx, dy) ->
                     grid.getOrNull(y + dy)?.getOrNull(x + dx)?.takeIf { it != '.' && it != 'k' && it != 'e' }
                 }
-                if (near != null) rgb = darken(colors.getValue(near))
+                if (near != null) rgb = darken(color(near))
             }
             if (white) rgb = 0xffffff
-            val alpha = if (ch == 'g' || ch == 'G') GHOST_ALPHA else 0xff
+            val alpha = when (ch) {
+                'g', 'G' -> GHOST_ALPHA
+                'Z' -> 0xB0
+                else -> 0xff
+            }
             out[y * w + x] = (alpha shl 24) or rgb
         }
         return out

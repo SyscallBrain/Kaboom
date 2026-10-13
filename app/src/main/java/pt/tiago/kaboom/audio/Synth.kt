@@ -24,6 +24,10 @@ object Synth {
         GameEvent.DOOR_OPEN -> notes(floatArrayOf(1046f, 1318f, 1568f), 0.1f, 0.4f)
         GameEvent.LEVEL_CLEAR -> notes(floatArrayOf(784f, 988f, 1175f, 1568f, 1175f, 1568f, 1976f), 0.11f, 0.4f)
         GameEvent.GAME_OVER -> notes(floatArrayOf(784f, 740f, 698f, 523f), 0.28f, 0.4f)
+        GameEvent.KICK -> sweep(900f, 1500f, 0.07f, 0.4f)
+        GameEvent.SHIELD_BREAK -> notes(floatArrayOf(2093f, 1568f, 1175f, 880f), 0.05f, 0.35f)
+        GameEvent.ENEMY_HURT -> sweep(1600f, 900f, 0.1f, 0.35f)
+        GameEvent.TELEPORT -> sweep(500f, 2200f, 0.25f, 0.3f, vibrato = true)
     }
 
     private fun square(phase: Double) = if (sin(phase) >= 0) 1f else -1f

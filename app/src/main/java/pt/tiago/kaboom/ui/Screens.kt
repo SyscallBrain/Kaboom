@@ -52,6 +52,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import pt.tiago.kaboom.audio.Feedback
 import pt.tiago.kaboom.game.Dir
+import pt.tiago.kaboom.game.EnemyKind
 import pt.tiago.kaboom.game.Game
 import pt.tiago.kaboom.game.GameEvent
 import pt.tiago.kaboom.game.ItemType
@@ -156,14 +157,15 @@ fun TitleScreen(best: Int, bestLevel: Int, onSettings: () -> Unit, onPlay: () ->
             val k = (size.width / (9 * ART)).toInt().coerceAtLeast(1)
             val ox = ((size.width - 9 * ART * k) / 2).toInt()
             val tile = ART * k
+            val ts = Art.tiles(Art.themeOf(0))
             for (x in 0 until 9) {
-                sprite(Art.wall, ox + x * tile, 0, k)
-                sprite(if (x % 2 == 0) Art.floor else Art.floor2, ox + x * tile, tile, k)
+                sprite(ts.wall, ox + x * tile, 0, k)
+                sprite(if (x % 2 == 0) ts.floor else ts.floor2, ox + x * tile, tile, k)
             }
             val run = (t * 40f) % (12 * ART) - ART
             val hx = ox + run.roundToInt() * k
             sprite(Art.hero(Dir.RIGHT, (t * 8).toInt() % 4), hx, tile, k)
-            sprite(Art.blob, hx - 2 * tile, tile + if ((t * 4).toInt() % 2 == 0) 0 else k, k)
+            sprite(Art.enemy(EnemyKind.BLOB, 0, false), hx - 2 * tile, tile + if ((t * 4).toInt() % 2 == 0) 0 else k, k)
             sprite(Art.bomb[(t * 10).toInt() % 2], ox + 4 * tile, 0, k)
         }
         Spacer(Modifier.height(28.dp))
@@ -186,18 +188,31 @@ fun TitleScreen(best: Int, bestLevel: Int, onSettings: () -> Unit, onPlay: () ->
             Text("MELHOR NÍVEL $bestLevel", style = pixelText(10.sp, Ui.Muted))
             Spacer(Modifier.height(24.dp))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            Legend(Art.item(ItemType.BOMB), "+BOMBA")
-            Legend(Art.item(ItemType.FIRE), "+FOGO")
-            Legend(Art.item(ItemType.SPEED), "+RAPIDEZ")
+        // Os 8 poderes, em duas filas
+        for (row in ItemType.entries.chunked(4)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                for (type in row) Legend(Art.item(type), itemLabel(type))
+            }
+            Spacer(Modifier.height(10.dp))
         }
     }
 }
 
+fun itemLabel(type: ItemType) = when (type) {
+    ItemType.BOMB -> "BOMBA"
+    ItemType.FIRE -> "FOGO"
+    ItemType.SPEED -> "RAPIDEZ"
+    ItemType.KICK -> "CHUTO"
+    ItemType.REMOTE -> "DETONAR"
+    ItemType.SHIELD -> "ESCUDO"
+    ItemType.PIERCE -> "PERFURA"
+    ItemType.LIFE -> "VIDA"
+}
+
 @Composable
 private fun Legend(img: ImageBitmap, text: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        PixelIcon(img, 48.dp)
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(70.dp)) {
+        PixelIcon(img, 40.dp)
         Spacer(Modifier.height(6.dp))
         Text(text, style = pixelText(8.sp, Ui.Muted))
     }
@@ -253,7 +268,13 @@ fun GameScreen(
     // por isso o HUD e os avisos recebem valores simples, lidos a cada frame.
     @Suppress("UNUSED_VARIABLE") val tick = frame
     val p = game.player
-    val hud = HudState(game.lives, game.level, p.maxBombs, p.range, p.speedUps, game.score)
+    val specials = buildList {
+        if (p.kick) add(ItemType.KICK)
+        if (p.remote) add(ItemType.REMOTE)
+        if (p.shield) add(ItemType.SHIELD)
+        if (p.pierce) add(ItemType.PIERCE)
+    }
+    val hud = HudState(game.lives, Levels.label(game.level), p.maxBombs, p.range, p.speedUps, game.score, specials)
     val banner = bannerFor(game)
 
     Box(Modifier.fillMaxSize()) {
@@ -279,8 +300,10 @@ fun GameScreen(
                 Modifier.fillMaxWidth().weight(1f).background(Ui.Night),
                 scheme = settings.scheme,
                 leftHanded = settings.leftHanded,
+                showDetonate = p.remote,
                 onDir = { d: Dir? -> game.input = d },
                 onBomb = { game.requestBomb() },
+                onDetonate = { game.requestDetonate() },
             )
         }
 
@@ -290,7 +313,7 @@ fun GameScreen(
                 Spacer(Modifier.height(20.dp))
                 Text("PONTOS ${game.score}", style = pixelText(16.sp))
                 Spacer(Modifier.height(10.dp))
-                Text("CHEGASTE AO NÍVEL ${game.level}", style = pixelText(10.sp, Ui.Muted))
+                Text("CHEGASTE AO NÍVEL ${Levels.label(game.level)}", style = pixelText(10.sp, Ui.Muted))
                 Spacer(Modifier.height(32.dp))
                 PixelButton("OUTRA VEZ", Modifier.width(260.dp), primary = true) {
                     effects.clear()
@@ -323,32 +346,34 @@ fun GameScreen(
     }
 }
 
+/** Linha 1: vidas, nível, pontos, pausa. Linha 2: poderes (os especiais só quando os tens). */
 @Composable
 private fun Hud(h: HudState, onPause: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(Ui.Night)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        HudStat(Art.iconHeart, "${h.lives}")
-        Text("NÍVEL ${h.level}", style = pixelText(10.sp, Ui.Gold))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+    Column(Modifier.fillMaxWidth().background(Ui.Night).padding(horizontal = 10.dp, vertical = 6.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            HudStat(Art.iconHeart, "${h.lives}")
+            Text("NÍVEL ${h.level}", style = pixelText(11.sp, Ui.Gold))
+            Text("${h.score}", style = pixelText(11.sp))
+            Box(
+                Modifier
+                    .size(36.dp)
+                    .background(Ui.Panel)
+                    .border(3.dp, Ui.Ink)
+                    .clickable(onClick = onPause),
+                contentAlignment = Alignment.Center,
+            ) { Text("II", style = pixelText(12.sp)) }
+        }
+        Spacer(Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             HudStat(Art.icon(ItemType.BOMB), "${h.bombs}")
             HudStat(Art.icon(ItemType.FIRE), "${h.range}")
             HudStat(Art.icon(ItemType.SPEED), "${h.speed}")
+            for (type in h.specials) PixelIcon(Art.icon(type), 24.dp)
         }
-        Text("${h.score}", style = pixelText(10.sp))
-        Box(
-            Modifier
-                .size(36.dp)
-                .background(Ui.Panel)
-                .border(3.dp, Ui.Ink)
-                .clickable(onClick = onPause),
-            contentAlignment = Alignment.Center,
-        ) { Text("II", style = pixelText(12.sp)) }
     }
 }
 
@@ -360,12 +385,21 @@ private fun HudStat(icon: ImageBitmap, value: String) {
     }
 }
 
-private data class HudState(val lives: Int, val level: Int, val bombs: Int, val range: Int, val speed: Int, val score: Int)
+private data class HudState(
+    val lives: Int,
+    val level: String,
+    val bombs: Int,
+    val range: Int,
+    val speed: Int,
+    val score: Int,
+    val specials: List<ItemType>,
+)
 
 /** Título e subtítulo do aviso a mostrar por cima do mapa, ou null se não houver. */
 private fun bannerFor(game: Game): Pair<String, String>? = when {
-    game.phase == Phase.START -> "NÍVEL ${game.level}" to (game.levelName ?: "MODO INFINITO")
-    game.phase == Phase.LEVEL_CLEAR && game.level == Levels.count -> "VITÓRIA!" to "MUNDO 1 CONCLUÍDO"
+    game.phase == Phase.START -> "NÍVEL ${Levels.label(game.level)}" to (game.levelName ?: "MODO INFINITO")
+    game.phase == Phase.LEVEL_CLEAR && Levels.isWorldEnd(game.level) ->
+        "VITÓRIA!" to "${Levels.worlds[Levels.worldOf(game.level)].name} CONCLUÍDO"
     game.phase == Phase.LEVEL_CLEAR -> "CONCLUÍDO!" to "+${500 + 100 * game.level} PONTOS"
     game.phase == Phase.PLAYING && game.time - game.doorOpenedAt < 2.2f -> "PORTA ABERTA!" to "ENCONTRA A SAÍDA"
     else -> null

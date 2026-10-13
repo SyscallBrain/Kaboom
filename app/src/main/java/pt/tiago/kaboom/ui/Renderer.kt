@@ -13,6 +13,7 @@ import pt.tiago.kaboom.game.Dir
 import pt.tiago.kaboom.game.Enemy
 import pt.tiago.kaboom.game.EnemyKind
 import pt.tiago.kaboom.game.Game
+import pt.tiago.kaboom.game.Levels
 import pt.tiago.kaboom.game.Phase
 import pt.tiago.kaboom.game.Tile
 import pt.tiago.kaboom.ui.pixel.Art
@@ -56,12 +57,13 @@ private fun snap(c: Float, k: Int) = ((c * ART - ART / 2f).roundToInt()) * k
 fun DrawScope.drawGame(g: Game, k: Int) {
     val t = g.time
     val tile = ART * k
+    val ts = Art.tiles(Art.themeOf(Levels.worldOf(g.level)))
 
     for (y in 0 until Game.H) for (x in 0 until Game.W) {
-        sprite(if ((x + y) % 2 == 0) Art.floor else Art.floor2, x * tile, y * tile, k)
+        sprite(if ((x + y) % 2 == 0) ts.floor else ts.floor2, x * tile, y * tile, k)
     }
     if (g.doorRevealed) {
-        val img = if (g.doorOpen) Art.doorOpen[(t * 10).toInt() % 8] else Art.door
+        val img = if (g.doorOpen) ts.doorOpen[(t * 10).toInt() % 8] else ts.door
         sprite(img, g.doorX * tile, g.doorY * tile, k)
     }
     for ((key, type) in g.items) {
@@ -78,13 +80,13 @@ fun DrawScope.drawGame(g: Game, k: Int) {
     }
     for (y in 0 until Game.H) for (x in 0 until Game.W) {
         when (g.tiles[y][x]) {
-            Tile.WALL -> sprite(Art.wall, x * tile, y * tile, k)
+            Tile.WALL -> sprite(ts.wall, x * tile, y * tile, k)
             Tile.BLOCK -> {
                 val b = g.burn[y][x]
                 val img = if (b > 0f) {
-                    Art.burning[((1f - b / Game.BURN) * 4).toInt().coerceIn(0, 3)]
+                    ts.burning[((1f - b / Game.BURN) * 4).toInt().coerceIn(0, 3)]
                 } else {
-                    Art.brick
+                    ts.brick
                 }
                 sprite(img, x * tile, y * tile, k)
             }
@@ -101,7 +103,16 @@ fun DrawScope.drawGame(g: Game, k: Int) {
         val e = a.coerceIn(0f, 1f) - 1f
         val pop = 1f + 2.7f * e * e * e + 1.7f * e * e
         val beat = if ((t * (3f + urgency * 9f)).toInt() % 2 == 0) 1f else 1.08f
-        sprite((if (hot) Art.bombHot else Art.bomb)[spark], b.x * tile, b.y * tile, k, scale = pop * beat)
+        // A deslizar (chutada): desenha-se entre a casa onde está e a seguinte
+        val sx = b.slide?.let { (it.dx * b.slideT * ART).roundToInt() * k } ?: 0
+        val sy = b.slide?.let { (it.dy * b.slideT * ART).roundToInt() * k } ?: 0
+        val img = when {
+            b.remote -> Art.bombRemote[(t * 3).toInt() % 2]
+            hot -> Art.bombHot[spark]
+            else -> Art.bomb[spark]
+        }
+        val scale = if (b.remote) pop else pop * beat
+        sprite(img, b.x * tile + sx, b.y * tile + sy, k, scale = scale)
     }
 
     drawFlames(g, k)
@@ -144,27 +155,33 @@ private fun DrawScope.drawFlames(g: Game, k: Int) {
 private fun DrawScope.drawEnemy(e: Enemy, k: Int, t: Float) {
     val x = snap(e.x, k)
     val y = snap(e.y, k)
+    val wounded = e.hp < e.kind.hp
     if (!e.alive) {
         if (e.dying < 0.45f) {
             // Pisca em branco antes de desaparecer
             val white = (e.dying * 14f).toInt() % 2 == 0
-            val img = when (e.kind) {
-                EnemyKind.BLOB -> if (white) Art.blobWhite else Art.blob
-                EnemyKind.EYE -> if (white) Art.batWhite else Art.bat[0]
-                EnemyKind.GHOST -> if (white) Art.ghostWhite else Art.ghost
-            }
-            sprite(img, x, y, k)
+            sprite(if (white) Art.enemyWhite(e.kind, wounded) else Art.enemy(e.kind, 0, wounded), x, y, k)
         } else {
             val f = ((e.dying - 0.45f) / 0.55f * 4).toInt().coerceIn(0, 3)
             sprite(Art.poof[f], x, y, k)
         }
         return
     }
-    when (e.kind) {
-        EnemyKind.BLOB -> sprite(Art.blob, x, y + if ((t * 4).toInt() % 2 == 0) 0 else k, k)
-        EnemyKind.EYE -> sprite(Art.bat[(t * 8).toInt() % 2], x, y + if ((t * 4).toInt() % 2 == 0) -k else 0, k)
-        EnemyKind.GHOST -> sprite(Art.ghost, x, y + intArrayOf(0, -1, -1, 0)[(t * 4).toInt() % 4] * k, k)
+    // Acabou de levar uma explosão mas aguentou: pisca em branco
+    if (e.hurt > 0f && (e.hurt * 14f).toInt() % 2 == 0) {
+        sprite(Art.enemyWhite(e.kind, wounded), x, y, k)
+        return
     }
+    val step = (t * 4).toInt()
+    val (frame, bob) = when (e.kind) {
+        EnemyKind.BLOB -> 0 to (if (step % 2 == 0) 0 else 1)
+        EnemyKind.EYE -> (t * 8).toInt() to (if (step % 2 == 0) -1 else 0)
+        EnemyKind.GHOST -> 0 to intArrayOf(0, -1, -1, 0)[step % 4]
+        EnemyKind.SNAKE -> (t * 6).toInt() to 0
+        EnemyKind.SNOWMAN -> 0 to (if (step % 2 == 0) 0 else 1)
+        EnemyKind.WIZARD -> (t * 3).toInt() to intArrayOf(0, -1, -1, 0)[step % 4]
+    }
+    sprite(Art.enemy(e.kind, frame, wounded), x, y + bob * k, k)
 }
 
 private fun DrawScope.drawPlayer(g: Game, k: Int) {
@@ -188,6 +205,7 @@ private fun DrawScope.drawPlayer(g: Game, k: Int) {
         else -> {
             val frame = if (p.moving) (p.walk * 4f).toInt() % 4 else 0
             sprite(Art.hero(p.facing, frame), x, y, k)
+            if (p.shield) sprite(Art.shieldBubble, x, y, k, alpha = 0.6f + 0.3f * ((g.time * 4).toInt() % 2))
         }
     }
 }

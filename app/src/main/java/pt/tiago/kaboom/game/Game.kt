@@ -25,6 +25,10 @@ class Game(private val rng: Random = Random.Default) {
         const val MAX_RANGE = 8
         const val MAX_SPEED = 4
         const val RESPAWN_SHIELD = 2.5f
+        const val SHIELD_BREAK_TIME = 2f
+        const val SLIDE_SPEED = 7f
+        const val HURT_TIME = 0.8f
+        const val MAX_LIVES = 9
         private const val EPS = 0.001f
     }
 
@@ -69,6 +73,7 @@ class Game(private val rng: Random = Random.Default) {
     /** Direcção que o jogador está a carregar (null = parado). Escrita pela UI. */
     var input: Dir? = null
     private var bombRequested = false
+    private var detonateRequested = false
 
     val doorOpen get() = enemies.none { it.alive }
 
@@ -86,12 +91,18 @@ class Game(private val rng: Random = Random.Default) {
         bombRequested = true
     }
 
+    /** Detonador remoto: rebenta a bomba mais antiga. */
+    fun requestDetonate() {
+        detonateRequested = true
+    }
+
     fun update(dt: Float) {
         time += dt
         phaseTime += dt
         when (phase) {
             Phase.START -> {
                 bombRequested = false
+                detonateRequested = false
                 if (phaseTime >= START_TIME) setPhase(Phase.PLAYING)
             }
             Phase.PLAYING -> {
@@ -134,6 +145,7 @@ class Game(private val rng: Random = Random.Default) {
         doorRevealed = false
         doorOpenedAt = -100f
         bombRequested = false
+        detonateRequested = false
         // O input não se limpa: é a UI que o controla, e quem segura o joystick
         // durante a mudança de nível deve continuar a andar.
         // Os poderes ganhos mantêm-se; só a posição e o estado de morte voltam ao início.
@@ -159,7 +171,7 @@ class Game(private val rng: Random = Random.Default) {
         for ((y, row) in def.rows.withIndex()) for ((x, c) in row.withIndex()) {
             tiles[y][x] = when (c) {
                 '#' -> Tile.WALL
-                'B', 'D', 'b', 'f', 's' -> Tile.BLOCK
+                'B', 'D', 'b', 'f', 's', 'k', 'r', 'h', 'p', 'l' -> Tile.BLOCK
                 else -> Tile.FLOOR
             }
             when (c) {
@@ -174,9 +186,17 @@ class Game(private val rng: Random = Random.Default) {
                 'b' -> hiddenItems[y * W + x] = ItemType.BOMB
                 'f' -> hiddenItems[y * W + x] = ItemType.FIRE
                 's' -> hiddenItems[y * W + x] = ItemType.SPEED
+                'k' -> hiddenItems[y * W + x] = ItemType.KICK
+                'r' -> hiddenItems[y * W + x] = ItemType.REMOTE
+                'h' -> hiddenItems[y * W + x] = ItemType.SHIELD
+                'p' -> hiddenItems[y * W + x] = ItemType.PIERCE
+                'l' -> hiddenItems[y * W + x] = ItemType.LIFE
                 'E' -> enemies += Enemy(EnemyKind.BLOB, x, y)
                 'Y' -> enemies += Enemy(EnemyKind.EYE, x, y)
                 'G' -> enemies += Enemy(EnemyKind.GHOST, x, y)
+                'C' -> enemies += Enemy(EnemyKind.SNAKE, x, y)
+                'N' -> enemies += Enemy(EnemyKind.SNOWMAN, x, y)
+                'M' -> enemies += Enemy(EnemyKind.WIZARD, x, y)
             }
         }
     }
@@ -214,19 +234,27 @@ class Game(private val rng: Random = Random.Default) {
         spots.shuffle(rng)
         val count = min(2 + n, 9)
         for (i in 0 until min(count, spots.size)) {
-            val kind = when {
-                n >= 4 && i % 3 == 2 -> EnemyKind.GHOST
-                n >= 2 && i % 2 == 1 -> EnemyKind.EYE
-                else -> EnemyKind.BLOB
+            // No modo infinito (n > 32) entram todos os tipos; antes disso, aos poucos.
+            val pool = when {
+                n > Levels.count -> EnemyKind.entries
+                n >= 4 -> listOf(EnemyKind.BLOB, EnemyKind.EYE, EnemyKind.GHOST)
+                n >= 2 -> listOf(EnemyKind.BLOB, EnemyKind.EYE)
+                else -> listOf(EnemyKind.BLOB)
             }
+            val kind = pool[i % pool.size]
             enemies += Enemy(kind, spots[i].first, spots[i].second)
         }
     }
 
-    private fun randomItem(): ItemType = when (rng.nextInt(10)) {
-        in 0..3 -> ItemType.BOMB
-        in 4..7 -> ItemType.FIRE
-        else -> ItemType.SPEED
+    private fun randomItem(): ItemType = when (rng.nextInt(100)) {
+        in 0..24 -> ItemType.BOMB
+        in 25..49 -> ItemType.FIRE
+        in 50..64 -> ItemType.SPEED
+        in 65..76 -> ItemType.KICK
+        in 77..84 -> ItemType.SHIELD
+        in 85..91 -> ItemType.REMOTE
+        in 92..97 -> ItemType.PIERCE
+        else -> ItemType.LIFE
     }
 
     /**
@@ -267,8 +295,13 @@ class Game(private val rng: Random = Random.Default) {
             bombRequested = false
             placeBomb()
         }
+        if (detonateRequested) {
+            detonateRequested = false
+            bombs.firstOrNull { it.remote && !it.exploded }?.let { explode(it) }
+        }
         p.moving = false
         if (p.invulnerable > 0f) p.invulnerable = max(0f, p.invulnerable - dt)
+        if (p.fireproof > 0f) p.fireproof = max(0f, p.fireproof - dt)
         input?.let { d ->
             p.facing = d
             val ox = p.x
@@ -291,6 +324,11 @@ class Game(private val rng: Random = Random.Default) {
                 ItemType.BOMB -> p.maxBombs = min(p.maxBombs + 1, MAX_BOMBS)
                 ItemType.FIRE -> p.range = min(p.range + 1, MAX_RANGE)
                 ItemType.SPEED -> p.speedUps = min(p.speedUps + 1, MAX_SPEED)
+                ItemType.KICK -> p.kick = true
+                ItemType.REMOTE -> p.remote = true
+                ItemType.SHIELD -> p.shield = true
+                ItemType.PIERCE -> p.pierce = true
+                ItemType.LIFE -> lives = min(lives + 1, MAX_LIVES)
             }
             score += 50
             events += GameEvent.ITEM
@@ -312,7 +350,7 @@ class Game(private val rng: Random = Random.Default) {
         val x = p.cellX
         val y = p.cellY
         if (bombs.size >= p.maxBombs || bombAt(x, y) != null || tiles[y][x] != Tile.FLOOR) return
-        bombs += Bomb(x, y, p.range)
+        bombs += Bomb(x, y, p.range, remote = p.remote, pierce = p.pierce)
         events += GameEvent.BOMB_PLACED
     }
 
@@ -369,6 +407,7 @@ class Game(private val rng: Random = Random.Default) {
             if (!playerFree(ncx + d.dx, ncy)) {
                 val limit = ncx + 0.5f
                 nx = if (d.dx > 0) min(nx, max(p.x, limit)) else max(nx, min(p.x, limit))
+                if (abs(nx - limit) < 0.05f) tryKick(ncx + d.dx, ncy, d)
             }
             p.x = nx
         } else {
@@ -376,15 +415,66 @@ class Game(private val rng: Random = Random.Default) {
             if (!playerFree(ncx, ncy + d.dy)) {
                 val limit = ncy + 0.5f
                 ny = if (d.dy > 0) min(ny, max(p.y, limit)) else max(ny, min(p.y, limit))
+                if (abs(ny - limit) < 0.05f) tryKick(ncx, ncy + d.dy, d)
             }
             p.y = ny
+        }
+    }
+
+    /** Com o poder de chutar, encostar a uma bomba põe-na a deslizar. */
+    private fun tryKick(x: Int, y: Int, d: Dir) {
+        if (!player.kick) return
+        val b = bombAt(x, y) ?: return
+        if (b.ownerInside || b.slide != null || !bombFree(x + d.dx, y + d.dy)) return
+        b.slide = d
+        b.slideT = 0f
+        events += GameEvent.KICK
+        fx += Fx(FxKind.KICK, x + 0.5f, y + 0.5f)
+    }
+
+    /** Uma bomba a deslizar só entra em chão vazio: sem bombas nem inimigos. */
+    private fun bombFree(x: Int, y: Int): Boolean {
+        if (x !in 0 until W || y !in 0 until H) return false
+        if (tiles[y][x] != Tile.FLOOR || bombAt(x, y) != null) return false
+        if (player.cellX == x && player.cellY == y) return false
+        return enemies.none { it.alive && ((it.cellX == x && it.cellY == y) || (it.toX == x && it.toY == y)) }
+    }
+
+    private fun updateSlide(b: Bomb, dt: Float) {
+        val d = b.slide ?: return
+        // Alguém se meteu à frente antes de meio caminho: a bomba pára onde está.
+        if (b.slideT < 0.5f && !bombFree(b.x + d.dx, b.y + d.dy)) {
+            b.slide = null
+            b.slideT = 0f
+            return
+        }
+        b.slideT += SLIDE_SPEED * dt
+        while (b.slideT >= 1f) {
+            b.x += d.dx
+            b.y += d.dy
+            b.slideT -= 1f
+            if (!bombFree(b.x + d.dx, b.y + d.dy)) {
+                b.slide = null
+                b.slideT = 0f
+                return
+            }
         }
     }
 
     private fun checkPlayerDeath() {
         val p = player
         val hitByEnemy = p.invulnerable <= 0f && enemies.any { it.alive && abs(it.x - p.x) < 0.7f && abs(it.y - p.y) < 0.7f }
-        if (flame[p.cellY][p.cellX] > 0f || hitByEnemy) {
+        val burnt = p.fireproof <= 0f && flame[p.cellY][p.cellX] > 0f
+        if ((burnt || hitByEnemy) && p.shield) {
+            // O escudo parte e dá uns segundos de protecção total para fugir
+            p.shield = false
+            p.invulnerable = SHIELD_BREAK_TIME
+            p.fireproof = SHIELD_BREAK_TIME
+            events += GameEvent.SHIELD_BREAK
+            fx += Fx(FxKind.SHIELD_BREAK, p.x, p.y)
+            return
+        }
+        if (burnt || hitByEnemy) {
             p.dying = 0f
             p.moving = false
             events += GameEvent.PLAYER_DIED
@@ -408,7 +498,8 @@ class Game(private val rng: Random = Random.Default) {
     private fun updateWorld(dt: Float) {
         for (b in bombs.toList()) {
             if (b.exploded) continue
-            b.timer -= dt
+            updateSlide(b, dt)
+            if (!b.remote) b.timer -= dt
             if (b.timer <= 0f) explode(b)
         }
 
@@ -437,11 +528,18 @@ class Game(private val rng: Random = Random.Default) {
 
         for (e in enemies) {
             updateEnemy(e, dt)
-            if (e.alive && flame[e.cellY][e.cellX] > 0f) {
-                e.dying = 0f
-                score += e.kind.points
-                events += GameEvent.ENEMY_DIED
-                fx += Fx(FxKind.SCORE, e.x, e.y - 0.3f, e.kind.points)
+            if (e.alive && e.hurt <= 0f && flame[e.cellY][e.cellX] > 0f) {
+                e.hp--
+                if (e.hp > 0) {
+                    e.hurt = HURT_TIME
+                    events += GameEvent.ENEMY_HURT
+                    fx += Fx(FxKind.HURT, e.x, e.y)
+                } else {
+                    e.dying = 0f
+                    score += e.kind.points
+                    events += GameEvent.ENEMY_DIED
+                    fx += Fx(FxKind.SCORE, e.x, e.y - 0.3f, e.kind.points)
+                }
             }
         }
         enemies.removeAll { it.dying > 1f }
@@ -476,7 +574,9 @@ class Game(private val rng: Random = Random.Default) {
                             score += 10
                             fx += Fx(FxKind.BLOCK_BROKEN, x + 0.5f, y + 0.5f)
                         }
-                        break
+                        // Fogo perfurante continua pelos tijolos fora
+                        if (!b.pierce) break
+                        continue
                     }
                     val other = bombAt(x, y)
                     if (other != null) {
@@ -516,6 +616,8 @@ class Game(private val rng: Random = Random.Default) {
             e.dying += dt
             return
         }
+        if (e.hurt > 0f) e.hurt = max(0f, e.hurt - dt)
+        if (e.kind.teleport) e.teleportIn -= dt
         val travelling = e.toX != e.fromX || e.toY != e.fromY
         if (travelling && !enemyFree(e, e.toX, e.toY)) {
             // Apareceu uma bomba no caminho: dá meia volta.
@@ -528,7 +630,7 @@ class Game(private val rng: Random = Random.Default) {
             e.dir = e.dir.opposite
         }
 
-        val dist = e.kind.speed * dt
+        val dist = e.speed * dt
         val tx = e.toX + 0.5f
         val ty = e.toY + 0.5f
         val dx = tx - e.x
@@ -538,6 +640,7 @@ class Game(private val rng: Random = Random.Default) {
             e.y = ty
             e.fromX = e.toX
             e.fromY = e.toY
+            if (e.kind.teleport && e.teleportIn <= 0f) teleport(e)
             chooseNext(e)
         } else {
             e.x += if (dx > 0) min(dist, dx) else max(-dist, dx)
@@ -545,9 +648,36 @@ class Game(private val rng: Random = Random.Default) {
         }
     }
 
+    /** O mago desaparece e reaparece numa casa livre, nunca encostado ao jogador. */
+    private fun teleport(e: Enemy) {
+        e.teleportIn = 3f + rng.nextFloat() * 3f
+        val spots = ArrayList<Pair<Int, Int>>()
+        for (y in 0 until H) for (x in 0 until W) {
+            val far = abs(x - player.cellX) + abs(y - player.cellY) >= 4
+            if (far && tiles[y][x] == Tile.FLOOR && flame[y][x] <= 0f && bombAt(x, y) == null) spots += x to y
+        }
+        if (spots.isEmpty()) return
+        fx += Fx(FxKind.TELEPORT, e.x, e.y)
+        val (x, y) = spots[rng.nextInt(spots.size)]
+        e.x = x + 0.5f
+        e.y = y + 0.5f
+        e.fromX = x
+        e.fromY = y
+        e.toX = x
+        e.toY = y
+        fx += Fx(FxKind.TELEPORT, e.x, e.y)
+        events += GameEvent.TELEPORT
+    }
+
     private fun chooseNext(e: Enemy) {
         val options = Dir.entries.filter { enemyFree(e, e.fromX + it.dx, e.fromY + it.dy) }
         if (options.isEmpty()) return
+        if (e.kind.straight && e.dir in options) {
+            // A cobra segue sempre em frente até bater
+            e.toX = e.fromX + e.dir.dx
+            e.toY = e.fromY + e.dir.dy
+            return
+        }
         // Evita andar para trás e para a frente, a não ser que seja um beco.
         val forward = if (options.size > 1) options.filter { it != e.dir.opposite } else options
         val p = player

@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import pt.tiago.kaboom.game.Dir
+import pt.tiago.kaboom.game.EnemyKind
 import pt.tiago.kaboom.game.Game
 import pt.tiago.kaboom.game.LevelDef
 import pt.tiago.kaboom.game.Levels
@@ -47,16 +48,18 @@ fun LevelSelectScreen(unlocked: Int, onPick: (Int) -> Unit, onBack: () -> Unit) 
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item(span = { GridItemSpan(2) }) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 8.dp)) {
-                Text("MUNDO 1", style = pixelTitle(26.sp))
-                Spacer(Modifier.height(10.dp))
-                Text("O PRADO", style = pixelText(12.sp, Ui.Muted))
+        for ((w, world) in Levels.worlds.withIndex()) {
+            item(span = { GridItemSpan(2) }) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)) {
+                    Text("MUNDO ${w + 1}", style = pixelTitle(24.sp))
+                    Spacer(Modifier.height(10.dp))
+                    Text(world.name, style = pixelText(12.sp, Ui.Muted))
+                }
             }
-        }
-        itemsIndexed(Levels.world1) { i, def ->
-            val n = i + 1
-            LevelCard(n, def, open = n <= unlocked, onClick = { onPick(n) })
+            itemsIndexed(world.levels) { i, def ->
+                val n = w * Levels.PER_WORLD + i + 1
+                LevelCard(n, def, open = n <= unlocked, onClick = { onPick(n) })
+            }
         }
         item(span = { GridItemSpan(2) }) {
             EndlessCard(open = unlocked > Levels.count, onClick = { onPick(Levels.count + 1) })
@@ -78,14 +81,14 @@ private fun LevelCard(n: Int, def: LevelDef, open: Boolean, onClick: () -> Unit)
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(Modifier.fillMaxWidth().aspectRatio(Game.W.toFloat() / Game.H), contentAlignment = Alignment.Center) {
-            Canvas(Modifier.fillMaxSize()) { drawLevelPreview(def) }
+            Canvas(Modifier.fillMaxSize()) { drawLevelPreview(def, Levels.worldOf(n)) }
             if (!open) {
                 Box(Modifier.fillMaxSize().background(Color(0xCC160F26)))
                 Text("?", style = pixelTitle(32.sp))
             }
         }
         Spacer(Modifier.height(8.dp))
-        Text("NÍVEL $n", style = pixelText(12.sp, if (open) Ui.Gold else Ui.Muted))
+        Text("NÍVEL ${Levels.label(n)}", style = pixelText(12.sp, if (open) Ui.Gold else Ui.Muted))
         Spacer(Modifier.height(6.dp))
         Text(
             if (open) def.name else "BLOQUEADO",
@@ -110,7 +113,7 @@ private fun EndlessCard(open: Boolean, onClick: () -> Unit) {
         Text("MODO INFINITO", style = pixelText(14.sp, if (open) Ui.Gold else Ui.Muted))
         Spacer(Modifier.height(10.dp))
         Text(
-            if (open) "Níveis gerados ao acaso, cada vez mais difíceis." else "Termina os 8 níveis do Mundo 1 para desbloquear.",
+            if (open) "Níveis gerados ao acaso, cada vez mais difíceis." else "Termina os ${Levels.count} níveis dos 4 mundos para desbloquear.",
             color = Ui.Muted,
             fontSize = 14.sp,
             textAlign = TextAlign.Center,
@@ -119,7 +122,8 @@ private fun EndlessCard(open: Boolean, onClick: () -> Unit) {
 }
 
 /** Miniatura do mapa com os sprites verdadeiros (os poderes e a porta ficam escondidos). */
-private fun DrawScope.drawLevelPreview(def: LevelDef) {
+private fun DrawScope.drawLevelPreview(def: LevelDef, world: Int) {
+    val ts = Art.tiles(Art.themeOf(world))
     val k = max(1, (size.width / (Game.W * ART)).toInt())
     val tile = ART * k
     val ox = ((size.width - Game.W * tile) / 2).toInt()
@@ -127,14 +131,21 @@ private fun DrawScope.drawLevelPreview(def: LevelDef) {
     for ((y, row) in def.rows.withIndex()) for ((x, c) in row.withIndex()) {
         val px = ox + x * tile
         val py = oy + y * tile
-        sprite(if ((x + y) % 2 == 0) Art.floor else Art.floor2, px, py, k)
-        when (c) {
-            '#' -> sprite(Art.wall, px, py, k)
-            'B', 'D', 'b', 'f', 's' -> sprite(Art.brick, px, py, k)
-            'P' -> sprite(Art.hero(Dir.DOWN, 0), px, py, k)
-            'E' -> sprite(Art.blob, px, py, k)
-            'Y' -> sprite(Art.bat[0], px, py, k)
-            'G' -> sprite(Art.ghost, px, py, k)
+        sprite(if ((x + y) % 2 == 0) ts.floor else ts.floor2, px, py, k)
+        val enemy = when (c) {
+            'E' -> EnemyKind.BLOB
+            'Y' -> EnemyKind.EYE
+            'G' -> EnemyKind.GHOST
+            'C' -> EnemyKind.SNAKE
+            'N' -> EnemyKind.SNOWMAN
+            'M' -> EnemyKind.WIZARD
+            else -> null
+        }
+        when {
+            c == '#' -> sprite(ts.wall, px, py, k)
+            c in "BDbfskrhpl" -> sprite(ts.brick, px, py, k)
+            c == 'P' -> sprite(Art.hero(Dir.DOWN, 0), px, py, k)
+            enemy != null -> sprite(Art.enemy(enemy, 0, false), px, py, k)
         }
     }
 }
