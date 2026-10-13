@@ -139,6 +139,10 @@ object Sprites {
         }.joinToString("")
     }
 
+    /** Bomba mágica do feiticeiro (roxa). */
+    val bombMagic1 = bomb1.map { it.replace('d', 'v').replace('D', 'V') }
+    val bombMagic2 = bomb2.map { it.replace('d', 'v').replace('D', 'V') }
+
     /** A piscar a vermelho quando está quase a rebentar. */
     val bombHot1 = bomb1.map { it.replace('d', 'R').replace('D', 'q') }
     val bombHot2 = bomb2.map { it.replace('d', 'R').replace('D', 'q') }

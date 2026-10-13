@@ -49,7 +49,7 @@ enum class EnemyKind(
 enum class Phase { START, PLAYING, DYING, LEVEL_CLEAR, GAME_OVER }
 
 /** Efeitos visuais com posição (em unidades de casa) — partículas, pontos a flutuar, tremor. */
-enum class FxKind { EXPLOSION, BLOCK_BROKEN, ITEM, SCORE, TELEPORT, SHIELD_BREAK, HURT, KICK }
+enum class FxKind { EXPLOSION, BLOCK_BROKEN, ITEM, SCORE, TELEPORT, SHIELD_BREAK, HURT, KICK, BOSS_LAND, BOSS_HIT }
 
 class Fx(val kind: FxKind, val x: Float, val y: Float, val value: Int = 0)
 
@@ -57,6 +57,7 @@ class Fx(val kind: FxKind, val x: Float, val y: Float, val value: Int = 0)
 enum class GameEvent {
     BOMB_PLACED, EXPLOSION, ITEM, ENEMY_DIED, PLAYER_DIED, DOOR_OPEN, LEVEL_CLEAR, GAME_OVER,
     KICK, SHIELD_BREAK, ENEMY_HURT, TELEPORT,
+    BOSS_HURT, BOSS_DEFEATED, BOSS_ATTACK, BOSS_LAND,
 }
 
 /**
@@ -70,6 +71,8 @@ class Bomb(
     val range: Int,
     val remote: Boolean = false,
     val pierce: Boolean = false,
+    /** Bomba mágica do feiticeiro: não conta para as bombas do jogador e não fere o boss. */
+    val byBoss: Boolean = false,
 ) {
     var timer = Game.FUSE
     var slide: Dir? = null

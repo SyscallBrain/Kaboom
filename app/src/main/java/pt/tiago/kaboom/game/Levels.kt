@@ -10,8 +10,9 @@ import kotlin.math.min
  * - tijolo com poder escondido: `b` bomba · `f` fogo · `s` rapidez · `k` chutar ·
  *   `r` detonador · `h` escudo · `p` fogo perfurante · `l` vida extra
  * - inimigos: `E` gota · `Y` morcego · `G` fantasma · `C` cobra · `N` boneco de neve · `M` mago
+ * - `O` boss (só nas arenas; aí não há `D` — a porta aparece quando o boss é derrotado)
  */
-class LevelDef(val name: String, val rows: List<String>)
+class LevelDef(val name: String, val rows: List<String>, val boss: BossKind? = null)
 
 /** Um mundo: 8 níveis com o mesmo cenário. */
 class World(val name: String, val levels: List<LevelDef>)
@@ -178,6 +179,27 @@ object Levels {
                 "#############",
             ),
         ),
+        LevelDef(
+            "O REI GOTA",
+            listOf(
+                "#############",
+                "#P.B.b.B.f..#",
+                "#.#.......#.#",
+                "#..........B#",
+                "#...........#",
+                "#s....O....B#",
+                "#...........#",
+                "#B.........B#",
+                "#...........#",
+                "#B.........h#",
+                "#...........#",
+                "#B.........B#",
+                "#.#.......#.#",
+                "#..B.B.f.B..#",
+                "#############",
+            ),
+            boss = BossKind.KING_SLIME,
+        ),
     )
 
     val world2 = listOf(
@@ -340,6 +362,27 @@ object Levels {
                 "#C..BB.BBh.E#",
                 "#############",
             ),
+        ),
+        LevelDef(
+            "O ESCORPIÃO REI",
+            listOf(
+                "#############",
+                "#P.B.b.B.f..#",
+                "#.#.......#.#",
+                "#..........B#",
+                "#..#.....#..#",
+                "#k....O....B#",
+                "#...........#",
+                "#B.........B#",
+                "#...........#",
+                "#B.........h#",
+                "#..#.....#..#",
+                "#B.........B#",
+                "#.#.......#.#",
+                "#..B.f.B.s..#",
+                "#############",
+            ),
+            boss = BossKind.SCORPION,
         ),
     )
 
@@ -504,6 +547,27 @@ object Levels {
                 "#############",
             ),
         ),
+        LevelDef(
+            "O YETI",
+            listOf(
+                "#############",
+                "#P.B.b.B.f..#",
+                "#.#.......#.#",
+                "#..........B#",
+                "#...........#",
+                "#r....O....B#",
+                "#...........#",
+                "#B..#...#..h#",
+                "#...........#",
+                "#B.........B#",
+                "#...........#",
+                "#B.........B#",
+                "#.#.......#.#",
+                "#..B.f.B.l..#",
+                "#############",
+            ),
+            boss = BossKind.YETI,
+        ),
     )
 
     val world4 = listOf(
@@ -667,6 +731,27 @@ object Levels {
                 "#############",
             ),
         ),
+        LevelDef(
+            "O FEITICEIRO",
+            listOf(
+                "#############",
+                "#P.B.b.B.f..#",
+                "#.#.......#.#",
+                "#..........B#",
+                "#..#.....#..#",
+                "#p....O....B#",
+                "#...........#",
+                "#B.........k#",
+                "#...........#",
+                "#B.........h#",
+                "#..#.....#..#",
+                "#B.........B#",
+                "#.#.......#.#",
+                "#..B.l.B.s..#",
+                "#############",
+            ),
+            boss = BossKind.SORCERER,
+        ),
     )
 
     val worlds = listOf(
@@ -678,7 +763,7 @@ object Levels {
 
     val all = worlds.flatMap { it.levels }
     val count get() = all.size
-    const val PER_WORLD = 8
+    const val PER_WORLD = 9
 
     /** Nível desenhado número [n] (a partir de 1), ou null se já for o modo infinito. */
     fun get(n: Int): LevelDef? = all.getOrNull(n - 1)
@@ -686,10 +771,20 @@ object Levels {
     /** Mundo (0..3) do nível [n]; no modo infinito os cenários vão rodando a cada 3 níveis. */
     fun worldOf(n: Int): Int = if (n <= count) (n - 1) / PER_WORLD else ((n - count - 1) / 3) % worlds.size
 
-    /** "2-3" para o 3.º nível do mundo 2; "∞5" para o 5.º nível do modo infinito. */
-    fun label(n: Int): String = if (n <= count) "${(n - 1) / PER_WORLD + 1}-${(n - 1) % PER_WORLD + 1}" else "∞${n - count}"
+    /** O último nível de cada mundo é a arena do boss. */
+    fun isBoss(n: Int) = get(n)?.boss != null
 
-    /** Último nível de um mundo: vitória! */
+    /** "2-3" para o 3.º nível do mundo 2; "BOSS 2" na arena; "∞5" no modo infinito. */
+    fun label(n: Int): String = when {
+        n > count -> "∞${n - count}"
+        isBoss(n) -> "BOSS ${(n - 1) / PER_WORLD + 1}"
+        else -> "${(n - 1) / PER_WORLD + 1}-${(n - 1) % PER_WORLD + 1}"
+    }
+
+    /** Como aparece no ecrã: "NÍVEL 2-3" ou "BOSS 2". */
+    fun title(n: Int): String = if (isBoss(n)) label(n) else "NÍVEL ${label(n)}"
+
+    /** Último nível de um mundo (o boss): vitória! */
     fun isWorldEnd(n: Int) = n <= count && n % PER_WORLD == 0
 
     /**

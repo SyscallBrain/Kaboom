@@ -3,6 +3,7 @@ package pt.tiago.kaboom.ui.pixel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import pt.tiago.kaboom.game.BossKind
 import pt.tiago.kaboom.game.ItemType
 
 class SpritesTest {
@@ -56,6 +57,16 @@ class SpritesTest {
         for (theme in Palette.Theme.entries) for ((name, g) in all16()) {
             // Não pode rebentar: todas as letras têm cor em todos os cenários
             Palette.rasterize(g, theme = theme).also { assertEquals("$name/$theme", 256, it.size) }
+        }
+    }
+
+    @Test
+    fun bossesTem32x32ECores() {
+        for (kind in BossKind.entries) for ((i, g) in BossSprites.frames(kind).withIndex()) {
+            assertEquals("$kind/$i", 32, g.size)
+            g.forEach { assertEquals("$kind/$i", 32, it.length) }
+            for (row in g) for (ch in row) assertTrue("$kind usa '$ch'", ch == '.' || ch in Palette.colors)
+            for (row in g) for (ch in row) assertTrue("$kind usa cor de cenário '$ch'", ch !in "1234mnMhcC")
         }
     }
 

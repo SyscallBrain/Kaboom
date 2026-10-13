@@ -28,6 +28,10 @@ object Synth {
         GameEvent.SHIELD_BREAK -> notes(floatArrayOf(2093f, 1568f, 1175f, 880f), 0.05f, 0.35f)
         GameEvent.ENEMY_HURT -> sweep(1600f, 900f, 0.1f, 0.35f)
         GameEvent.TELEPORT -> sweep(500f, 2200f, 0.25f, 0.3f, vibrato = true)
+        GameEvent.BOSS_HURT -> sweep(1200f, 300f, 0.25f, 0.45f, vibrato = true)
+        GameEvent.BOSS_DEFEATED -> notes(floatArrayOf(523f, 659f, 784f, 1046f, 1318f, 1568f, 2093f), 0.1f, 0.4f)
+        GameEvent.BOSS_ATTACK -> sweep(700f, 1400f, 0.3f, 0.35f, vibrato = true)
+        GameEvent.BOSS_LAND -> explosion()
     }
 
     private fun square(phase: Double) = if (sin(phase) >= 0) 1f else -1f

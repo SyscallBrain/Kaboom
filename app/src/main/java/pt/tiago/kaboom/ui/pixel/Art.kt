@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import pt.tiago.kaboom.R
+import pt.tiago.kaboom.game.BossKind
 import pt.tiago.kaboom.game.Dir
 import pt.tiago.kaboom.game.EnemyKind
 import pt.tiago.kaboom.game.ItemType
@@ -105,6 +106,12 @@ object Art {
     val bomb by lazy { listOf(img(Sprites.bomb1), img(Sprites.bomb2)) }
     val bombHot by lazy { listOf(img(Sprites.bombHot1), img(Sprites.bombHot2)) }
     val bombRemote by lazy { listOf(img(Sprites.bombRemote1), img(Sprites.bombRemote2)) }
+    val bombMagic by lazy { listOf(img(Sprites.bombMagic1), img(Sprites.bombMagic2)) }
+
+    private val bossFrames by lazy { BossKind.entries.associateWith { k -> BossSprites.frames(k).map { img(it) } } }
+    private val bossWhite by lazy { BossKind.entries.associateWith { k -> img(BossSprites.frames(k)[0], white = true) } }
+    fun boss(kind: BossKind, frame: Int): ImageBitmap = bossFrames.getValue(kind).let { it[frame % it.size] }
+    fun bossWhite(kind: BossKind): ImageBitmap = bossWhite.getValue(kind)
 
     private val flames by lazy {
         Sprites.FlameKind.entries.associateWith { k -> (0..2).map { img(Sprites.flame(k, it)) } }

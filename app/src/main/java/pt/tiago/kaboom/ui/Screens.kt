@@ -274,7 +274,8 @@ fun GameScreen(
         if (p.shield) add(ItemType.SHIELD)
         if (p.pierce) add(ItemType.PIERCE)
     }
-    val hud = HudState(game.lives, Levels.label(game.level), p.maxBombs, p.range, p.speedUps, game.score, specials)
+    val hud = HudState(game.lives, Levels.title(game.level), p.maxBombs, p.range, p.speedUps, game.score, specials)
+    val bossBar = game.boss?.takeIf { !it.defeated }?.let { it.kind.title to it.hp.coerceAtLeast(0) }
     val banner = bannerFor(game)
 
     Box(Modifier.fillMaxSize()) {
@@ -294,6 +295,7 @@ fun GameScreen(
                     }
                     drawIris(game, Offset(b.ox + game.player.x * b.tile, b.oy + game.player.y * b.tile))
                 }
+                if (bossBar != null) BossBar(bossBar.first, bossBar.second, game.boss!!.kind.hp)
                 if (banner != null) Banner(banner.first, banner.second)
             }
             Controls(
@@ -313,7 +315,7 @@ fun GameScreen(
                 Spacer(Modifier.height(20.dp))
                 Text("PONTOS ${game.score}", style = pixelText(16.sp))
                 Spacer(Modifier.height(10.dp))
-                Text("CHEGASTE AO NÍVEL ${Levels.label(game.level)}", style = pixelText(10.sp, Ui.Muted))
+                Text("CHEGASTE AO ${Levels.title(game.level)}", style = pixelText(10.sp, Ui.Muted))
                 Spacer(Modifier.height(32.dp))
                 PixelButton("OUTRA VEZ", Modifier.width(260.dp), primary = true) {
                     effects.clear()
@@ -356,7 +358,7 @@ private fun Hud(h: HudState, onPause: () -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             HudStat(Art.iconHeart, "${h.lives}")
-            Text("NÍVEL ${h.level}", style = pixelText(11.sp, Ui.Gold))
+            Text(h.level, style = pixelText(11.sp, Ui.Gold))
             Text("${h.score}", style = pixelText(11.sp))
             Box(
                 Modifier
@@ -397,7 +399,8 @@ private data class HudState(
 
 /** Título e subtítulo do aviso a mostrar por cima do mapa, ou null se não houver. */
 private fun bannerFor(game: Game): Pair<String, String>? = when {
-    game.phase == Phase.START -> "NÍVEL ${Levels.label(game.level)}" to (game.levelName ?: "MODO INFINITO")
+    game.phase == Phase.START && game.boss != null -> "BOSS!" to (game.levelName ?: "")
+    game.phase == Phase.START -> Levels.title(game.level) to (game.levelName ?: "MODO INFINITO")
     game.phase == Phase.LEVEL_CLEAR && Levels.isWorldEnd(game.level) ->
         "VITÓRIA!" to "${Levels.worlds[Levels.worldOf(game.level)].name} CONCLUÍDO"
     game.phase == Phase.LEVEL_CLEAR -> "CONCLUÍDO!" to "+${500 + 100 * game.level} PONTOS"
@@ -418,6 +421,30 @@ private fun Banner(text: String, sub: String) {
             Text(text, style = pixelTitle(22.sp))
             Spacer(Modifier.height(12.dp))
             Text(sub, style = pixelText(10.sp))
+        }
+    }
+}
+
+/** Nome do boss e a vida em blocos, no topo do mapa. */
+@Composable
+private fun BossBar(name: String, hp: Int, max: Int) {
+    Box(Modifier.fillMaxSize().padding(top = 6.dp), contentAlignment = Alignment.TopCenter) {
+        Column(
+            Modifier.background(Ui.Scrim).border(3.dp, Ui.PanelEdge).padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(name, style = pixelText(9.sp, Ui.Gold))
+            Spacer(Modifier.height(5.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                repeat(max) { i ->
+                    Box(
+                        Modifier
+                            .size(width = 14.dp, height = 9.dp)
+                            .background(if (i < hp) Ui.Red else Ui.Ink)
+                            .border(1.dp, Ui.Ink),
+                    )
+                }
+            }
         }
     }
 }

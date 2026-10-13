@@ -1,8 +1,10 @@
 package pt.tiago.kaboom.game
 
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
@@ -29,6 +31,8 @@ class Game(private val rng: Random = Random.Default) {
         const val SLIDE_SPEED = 7f
         const val HURT_TIME = 0.8f
         const val MAX_LIVES = 9
+        const val BOSS_R = 0.85f
+        const val BOSS_HURT_TIME = 1.0f
         private const val EPS = 0.001f
     }
 
@@ -41,6 +45,12 @@ class Game(private val rng: Random = Random.Default) {
     val flame = Array(H) { FloatArray(W) }
     val flameH = Array(H) { BooleanArray(W) }
     val flameV = Array(H) { BooleanArray(W) }
+
+    /** Fogo só das bombas mágicas do boss (não lhe faz mal a ele). */
+    val flameBoss = Array(H) { BooleanArray(W) }
+
+    var boss: Boss? = null; private set
+    private var bossLanded = false
 
     /** Itens escondidos debaixo de blocos e itens já à vista. Chave: y * W + x. */
     val hiddenItems = HashMap<Int, ItemType>()
@@ -75,7 +85,7 @@ class Game(private val rng: Random = Random.Default) {
     private var bombRequested = false
     private var detonateRequested = false
 
-    val doorOpen get() = enemies.none { it.alive }
+    val doorOpen get() = enemies.none { it.alive } && boss?.defeated != false
 
     fun newGame(startLevel: Int = 1) {
         lives = START_LIVES
@@ -137,6 +147,8 @@ class Game(private val rng: Random = Random.Default) {
         }
         hiddenItems.clear()
         items.clear()
+        boss = null
+        for (row in flameBoss) row.fill(false)
         fx.clear()
         bombs.clear()
         enemies.clear()
@@ -197,6 +209,13 @@ class Game(private val rng: Random = Random.Default) {
                 'C' -> enemies += Enemy(EnemyKind.SNAKE, x, y)
                 'N' -> enemies += Enemy(EnemyKind.SNOWMAN, x, y)
                 'M' -> enemies += Enemy(EnemyKind.WIZARD, x, y)
+                'O' -> boss = Boss(requireNotNull(def.boss) { "${def.name}: 'O' sem boss" }, x + 0.5f, y + 0.5f).also { it.cooldown = 2.5f }
+            }
+        }
+        boss?.let { b ->
+            if (b.kind == BossKind.KING_SLIME) {
+                b.vx = 1f
+                b.vy = 1f
             }
         }
     }
@@ -259,9 +278,9 @@ class Game(private val rng: Random = Random.Default) {
 
     /**
      * Carrega um mapa desenhado em texto (para testes): '#' parede, 'B' bloco, '.' chão,
-     * 'P' jogador, 'E' inimigo, 'D' porta já à vista. O que faltar fica parede.
+     * 'P' jogador, 'E' inimigo, 'D' porta já à vista, 'O' boss ([bossKind]). O que faltar fica parede.
      */
-    fun loadMap(rows: List<String>) {
+    fun loadMap(rows: List<String>, bossKind: BossKind? = null) {
         resetBoard()
         for ((y, row) in rows.withIndex()) for ((x, c) in row.withIndex()) {
             if (x >= W || y >= H) continue
@@ -276,6 +295,7 @@ class Game(private val rng: Random = Random.Default) {
                     player.y = y + 0.5f
                 }
                 'E' -> enemies += Enemy(EnemyKind.BLOB, x, y)
+                'O' -> boss = Boss(requireNotNull(bossKind), x + 0.5f, y + 0.5f)
                 'D' -> {
                     doorX = x
                     doorY = y
@@ -349,7 +369,7 @@ class Game(private val rng: Random = Random.Default) {
         val p = player
         val x = p.cellX
         val y = p.cellY
-        if (bombs.size >= p.maxBombs || bombAt(x, y) != null || tiles[y][x] != Tile.FLOOR) return
+        if (bombs.count { !it.byBoss } >= p.maxBombs || bombAt(x, y) != null || tiles[y][x] != Tile.FLOOR) return
         bombs += Bomb(x, y, p.range, remote = p.remote, pierce = p.pierce)
         events += GameEvent.BOMB_PLACED
     }
@@ -463,7 +483,12 @@ class Game(private val rng: Random = Random.Default) {
 
     private fun checkPlayerDeath() {
         val p = player
-        val hitByEnemy = p.invulnerable <= 0f && enemies.any { it.alive && abs(it.x - p.x) < 0.7f && abs(it.y - p.y) < 0.7f }
+        val b = boss
+        val touchBoss = b != null && b.alive && !b.airborne && abs(b.x - p.x) < BOSS_R + 0.3f && abs(b.y - p.y) < BOSS_R + 0.3f
+        val crushed = bossLanded && b != null && abs(b.x - p.x) < 1.4f && abs(b.y - p.y) < 1.4f
+        bossLanded = false
+        val hitByEnemy = p.invulnerable <= 0f &&
+            (touchBoss || crushed || enemies.any { it.alive && abs(it.x - p.x) < 0.7f && abs(it.y - p.y) < 0.7f })
         val burnt = p.fireproof <= 0f && flame[p.cellY][p.cellX] > 0f
         if ((burnt || hitByEnemy) && p.shield) {
             // O escudo parte e dá uns segundos de protecção total para fugir
@@ -510,6 +535,7 @@ class Game(private val rng: Random = Random.Default) {
                     flame[y][x] = 0f
                     flameH[y][x] = false
                     flameV[y][x] = false
+                    flameBoss[y][x] = false
                 }
             }
             if (burn[y][x] > 0f) {
@@ -543,6 +569,7 @@ class Game(private val rng: Random = Random.Default) {
             }
         }
         enemies.removeAll { it.dying > 1f }
+        updateBoss(dt)
 
         val open = doorOpen
         if (open && !doorWasOpen) {
@@ -560,7 +587,7 @@ class Game(private val rng: Random = Random.Default) {
         while (queue.isNotEmpty()) {
             val b = queue.removeFirst()
             bombs.remove(b)
-            ignite(b.x, b.y, h = true, v = true)
+            ignite(b.x, b.y, h = true, v = true, byBoss = b.byBoss)
             fx += Fx(FxKind.EXPLOSION, b.x + 0.5f, b.y + 0.5f)
             for (d in Dir.entries) {
                 for (i in 1..b.range) {
@@ -586,7 +613,7 @@ class Game(private val rng: Random = Random.Default) {
                         }
                         break
                     }
-                    ignite(x, y, h = d.dx != 0, v = d.dy != 0)
+                    ignite(x, y, h = d.dx != 0, v = d.dy != 0, byBoss = b.byBoss)
                     // O fogo destrói os itens à vista e pára aí.
                     if (items.remove(y * W + x) != null) break
                 }
@@ -595,10 +622,265 @@ class Game(private val rng: Random = Random.Default) {
         events += GameEvent.EXPLOSION
     }
 
-    private fun ignite(x: Int, y: Int, h: Boolean, v: Boolean) {
+    private fun ignite(x: Int, y: Int, h: Boolean, v: Boolean, byBoss: Boolean = false) {
+        // Fogo do jogador por cima de fogo mágico passa a ferir o boss
+        flameBoss[y][x] = if (byBoss) flame[y][x] <= 0f || flameBoss[y][x] else false
         flame[y][x] = FLAME
         if (h) flameH[y][x] = true
         if (v) flameV[y][x] = true
+    }
+
+    // ---------------------------------------------------------------- bosses
+
+    /** A caixa do boss centrada em (x, y) bate nalguma parede ou tijolo? */
+    private fun bossBlocked(x: Float, y: Float): Boolean {
+        val r = BOSS_R
+        for (cy in floor(y - r).toInt()..floor(y + r - 0.001f).toInt()) {
+            for (cx in floor(x - r).toInt()..floor(x + r - 0.001f).toInt()) {
+                if (cx !in 0 until W || cy !in 0 until H || tiles[cy][cx] != Tile.FLOOR) return true
+            }
+        }
+        return false
+    }
+
+    /** Move o boss; devolve (bateu na horizontal, bateu na vertical). */
+    private fun bossMove(b: Boss, dx: Float, dy: Float): Pair<Boolean, Boolean> {
+        val hitX = bossBlocked(b.x + dx, b.y)
+        if (!hitX) b.x += dx
+        val hitY = bossBlocked(b.x, b.y + dy)
+        if (!hitY) b.y += dy
+        return hitX to hitY
+    }
+
+    private fun setBossState(b: Boss, s: BossState) {
+        b.state = s
+        b.stateTime = 0f
+    }
+
+    private fun updateBoss(dt: Float) {
+        val b = boss ?: return
+        if (!b.alive) {
+            updateBossDeath(b, dt)
+            return
+        }
+        b.stateTime += dt
+        b.cooldown -= dt
+        if (b.hurt > 0f) b.hurt = max(0f, b.hurt - dt)
+
+        when (b.kind) {
+            BossKind.KING_SLIME -> updateKingSlime(b, dt)
+            BossKind.SCORPION -> updateScorpion(b, dt)
+            BossKind.YETI -> updateYeti(b, dt)
+            BossKind.SORCERER -> updateSorcerer(b, dt)
+        }
+
+        if (!b.airborne && b.hurt <= 0f && bossInFire(b)) {
+            b.hp--
+            b.hurt = BOSS_HURT_TIME
+            fx += Fx(FxKind.BOSS_HIT, b.x, b.y)
+            if (b.hp > 0) {
+                events += GameEvent.BOSS_HURT
+            } else {
+                b.dying = 0f
+                score += b.kind.points
+                events += GameEvent.BOSS_DEFEATED
+                fx += Fx(FxKind.SCORE, b.x, b.y - 1f, b.kind.points)
+                // Os lacaios caem com o chefe
+                for (e in enemies) if (e.alive) e.dying = 0f
+            }
+        }
+    }
+
+    private fun bossInFire(b: Boss): Boolean {
+        val r = BOSS_R
+        for (cy in floor(b.y - r).toInt()..floor(b.y + r - 0.001f).toInt()) {
+            for (cx in floor(b.x - r).toInt()..floor(b.x + r - 0.001f).toInt()) {
+                if (cx in 0 until W && cy in 0 until H && flame[cy][cx] > 0f && !flameBoss[cy][cx]) return true
+            }
+        }
+        return false
+    }
+
+    /** Explosões em série durante 1,6 s, e depois aparece a porta onde o boss caiu. */
+    private fun updateBossDeath(b: Boss, dt: Float) {
+        if (b.defeated) return
+        b.dying += dt
+        b.nextBoom -= dt
+        if (b.nextBoom <= 0f) {
+            b.nextBoom = 0.22f
+            fx += Fx(FxKind.EXPLOSION, b.x + (rng.nextFloat() - 0.5f) * 1.6f, b.y + (rng.nextFloat() - 0.5f) * 1.6f)
+            events += GameEvent.EXPLOSION
+        }
+        if (b.dying >= 1.6f) {
+            b.defeated = true
+            val dx = floor(b.x).toInt()
+            val dy = floor(b.y).toInt()
+            tiles[dy][dx] = Tile.FLOOR
+            doorX = dx
+            doorY = dy
+            doorRevealed = true
+        }
+    }
+
+    /** Rei Gota: salta em diagonal pela arena e larga gotas pequenas. */
+    private fun updateKingSlime(b: Boss, dt: Float) {
+        val speed = 1.7f * b.rage
+        val len = sqrt(b.vx * b.vx + b.vy * b.vy).coerceAtLeast(0.001f)
+        val (hitX, hitY) = bossMove(b, b.vx / len * speed * dt, b.vy / len * speed * dt)
+        if (hitX) b.vx = -b.vx
+        if (hitY) b.vy = -b.vy
+        if (b.cooldown <= 0f) {
+            b.cooldown = 6f / b.rage
+            if (enemies.count { it.alive } < 4) {
+                var spawned = false
+                for ((ox, oy) in listOf(-2 to 0, 2 to 0, 0 to 2, 0 to -2)) {
+                    val cx = floor(b.x).toInt() + ox
+                    val cy = floor(b.y).toInt() + oy
+                    val far = abs(cx - player.cellX) + abs(cy - player.cellY) >= 3
+                    if (cx in 0 until W && cy in 0 until H && tiles[cy][cx] == Tile.FLOOR && bombAt(cx, cy) == null && far) {
+                        enemies += Enemy(EnemyKind.BLOB, cx, cy)
+                        fx += Fx(FxKind.TELEPORT, cx + 0.5f, cy + 0.5f)
+                        spawned = true
+                        if (enemies.count { it.alive } >= 4) break
+                    }
+                }
+                if (spawned) events += GameEvent.BOSS_ATTACK
+            }
+        }
+    }
+
+    /** Escorpião Rei: passeia; se ficares alinhado com ele, prepara-se e investe até bater. */
+    private fun updateScorpion(b: Boss, dt: Float) {
+        val p = player
+        when (b.state) {
+            BossState.MOVE -> {
+                if (b.vx == 0f && b.vy == 0f || b.stateTime > 1.6f) {
+                    val d = Dir.entries[rng.nextInt(4)]
+                    b.vx = d.dx.toFloat()
+                    b.vy = d.dy.toFloat()
+                    b.stateTime = 0f
+                }
+                val (hitX, hitY) = bossMove(b, b.vx * 1.6f * dt, b.vy * 1.6f * dt)
+                if (hitX || hitY) {
+                    b.vx = 0f
+                    b.vy = 0f
+                }
+                if (b.cooldown <= 0f) {
+                    val dir = when {
+                        abs(p.y - b.y) < 0.7f -> if (p.x > b.x) Dir.RIGHT else Dir.LEFT
+                        abs(p.x - b.x) < 0.7f -> if (p.y > b.y) Dir.DOWN else Dir.UP
+                        else -> null
+                    }
+                    if (dir != null) {
+                        b.dashDir = dir
+                        setBossState(b, BossState.CHARGE)
+                        events += GameEvent.BOSS_ATTACK
+                    }
+                }
+            }
+            BossState.CHARGE -> if (b.stateTime >= 0.6f / b.rage) setBossState(b, BossState.DASH)
+            BossState.DASH -> {
+                val step = 7.5f * dt
+                val (hitX, hitY) = bossMove(b, b.dashDir.dx * step, b.dashDir.dy * step)
+                if (hitX || hitY) {
+                    setBossState(b, BossState.STUN)
+                    events += GameEvent.BOSS_LAND
+                    fx += Fx(FxKind.BOSS_LAND, b.x, b.y)
+                }
+            }
+            BossState.STUN -> if (b.stateTime >= 1.5f) {
+                setBossState(b, BossState.MOVE)
+                b.cooldown = 2.5f / b.rage
+            }
+            else -> setBossState(b, BossState.MOVE)
+        }
+    }
+
+    /** Yeti: anda atrás de ti e, de vez em quando, salta para onde estás (a sombra avisa). */
+    private fun updateYeti(b: Boss, dt: Float) {
+        val p = player
+        when (b.state) {
+            BossState.JUMP -> {
+                val k = (b.stateTime / 1.1f).coerceAtMost(1f)
+                b.x = b.jumpFromX + (b.jumpToX - b.jumpFromX) * k
+                b.y = b.jumpFromY + (b.jumpToY - b.jumpFromY) * k
+                if (k >= 1f) {
+                    setBossState(b, BossState.STUN)
+                    bossLanded = true
+                    events += GameEvent.BOSS_LAND
+                    fx += Fx(FxKind.BOSS_LAND, b.x, b.y)
+                }
+            }
+            BossState.STUN -> if (b.stateTime >= 0.9f) {
+                setBossState(b, BossState.MOVE)
+                b.cooldown = 4.5f / b.rage
+            }
+            else -> {
+                val dx = p.x - b.x
+                val dy = p.y - b.y
+                val len = sqrt(dx * dx + dy * dy).coerceAtLeast(0.001f)
+                bossMove(b, dx / len * 1.1f * dt, dy / len * 1.1f * dt)
+                if (b.cooldown <= 0f) {
+                    b.jumpFromX = b.x
+                    b.jumpFromY = b.y
+                    // Aterra onde o jogador está agora, se lá couber
+                    val tx = p.x.coerceIn(1f + BOSS_R, W - 1f - BOSS_R)
+                    val ty = p.y.coerceIn(1f + BOSS_R, H - 1f - BOSS_R)
+                    val ok = !bossBlocked(tx, ty)
+                    b.jumpToX = if (ok) tx else b.x
+                    b.jumpToY = if (ok) ty else b.y
+                    setBossState(b, BossState.JUMP)
+                    events += GameEvent.BOSS_ATTACK
+                }
+            }
+        }
+    }
+
+    /** Feiticeiro: teletransporta-se para longe e lança uma bomba mágica aos teus pés. */
+    private fun updateSorcerer(b: Boss, dt: Float) {
+        val p = player
+        when (b.state) {
+            BossState.CAST -> if (b.stateTime >= 0.5f) {
+                val x = p.cellX
+                val y = p.cellY
+                if (tiles[y][x] == Tile.FLOOR && bombAt(x, y) == null) {
+                    bombs += Bomb(x, y, 3, byBoss = true).apply {
+                        ownerInside = true
+                        timer = 1.7f
+                    }
+                    events += GameEvent.BOMB_PLACED
+                }
+                setBossState(b, BossState.MOVE)
+                b.cooldown = 3.4f / b.rage
+            }
+            else -> {
+                if (b.vx == 0f && b.vy == 0f) {
+                    b.vx = if (rng.nextBoolean()) 1f else -1f
+                    b.vy = if (rng.nextBoolean()) 1f else -1f
+                }
+                val (hitX, hitY) = bossMove(b, b.vx * 0.9f * dt, b.vy * 0.9f * dt)
+                if (hitX) b.vx = -b.vx
+                if (hitY) b.vy = -b.vy
+                if (b.cooldown <= 0f) {
+                    val spots = ArrayList<Pair<Float, Float>>()
+                    for (y in 1 until H - 1) for (x in 1 until W - 1) {
+                        val cx = x + 0.5f
+                        val cy = y + 0.5f
+                        if (abs(cx - p.x) + abs(cy - p.y) >= 5f && !bossBlocked(cx, cy)) spots += cx to cy
+                    }
+                    if (spots.isNotEmpty()) {
+                        fx += Fx(FxKind.TELEPORT, b.x, b.y)
+                        val (nx, ny) = spots[rng.nextInt(spots.size)]
+                        b.x = nx
+                        b.y = ny
+                        fx += Fx(FxKind.TELEPORT, b.x, b.y)
+                        events += GameEvent.TELEPORT
+                    }
+                    setBossState(b, BossState.CAST)
+                    events += GameEvent.BOSS_ATTACK
+                }
+            }
+        }
     }
 
     // ---------------------------------------------------------------- inimigos

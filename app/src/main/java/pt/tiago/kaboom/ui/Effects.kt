@@ -98,6 +98,14 @@ class Effects {
             FxKind.HURT -> repeat(10) {
                 burst(f, speed = 2.5f, life = 0.35f, color = Color.White, size = 0.08f, gravity = 0f, square = true)
             }
+            FxKind.BOSS_LAND -> {
+                shake = 0.6f
+                repeat(18) { burst(f, speed = 2.5f + rnd.nextFloat() * 2f, life = 0.5f, color = Smoke, size = 0.14f, gravity = 2f, square = true) }
+            }
+            FxKind.BOSS_HIT -> {
+                shake = min(shake + 0.3f, 0.6f)
+                repeat(16) { burst(f, speed = 3f + rnd.nextFloat() * 3f, life = 0.45f, color = if (rnd.nextBoolean()) Color.White else FlameYellow, size = 0.1f, gravity = 0f, square = true) }
+            }
             FxKind.KICK -> repeat(6) {
                 burst(f, speed = 1.2f, life = 0.4f, color = Smoke, size = 0.1f, gravity = -1f, square = true)
             }

@@ -72,6 +72,9 @@ class Feedback(context: Context) {
             GameEvent.EXPLOSION -> 50L
             GameEvent.PLAYER_DIED -> 300L
             GameEvent.SHIELD_BREAK -> 120L
+            GameEvent.BOSS_HURT -> 70L
+            GameEvent.BOSS_LAND -> 90L
+            GameEvent.BOSS_DEFEATED -> 400L
             else -> return
         }
         // Força = amplitude (se o telemóvel a suportar) e duração.

@@ -9,6 +9,9 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import pt.tiago.kaboom.game.Boss
+import pt.tiago.kaboom.game.BossKind
+import pt.tiago.kaboom.game.BossState
 import pt.tiago.kaboom.game.Dir
 import pt.tiago.kaboom.game.Enemy
 import pt.tiago.kaboom.game.EnemyKind
@@ -18,7 +21,10 @@ import pt.tiago.kaboom.game.Phase
 import pt.tiago.kaboom.game.Tile
 import pt.tiago.kaboom.ui.pixel.Art
 import pt.tiago.kaboom.ui.pixel.Sprites.FlameKind
+import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.sin
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
@@ -107,6 +113,7 @@ fun DrawScope.drawGame(g: Game, k: Int) {
         val sx = b.slide?.let { (it.dx * b.slideT * ART).roundToInt() * k } ?: 0
         val sy = b.slide?.let { (it.dy * b.slideT * ART).roundToInt() * k } ?: 0
         val img = when {
+            b.byBoss -> Art.bombMagic[spark]
             b.remote -> Art.bombRemote[(t * 3).toInt() % 2]
             hot -> Art.bombHot[spark]
             else -> Art.bomb[spark]
@@ -117,7 +124,50 @@ fun DrawScope.drawGame(g: Game, k: Int) {
 
     drawFlames(g, k)
     for (e in g.enemies) drawEnemy(e, k, t)
+    // O yeti no ar é desenhado por cima de tudo (incluindo o jogador)
+    g.boss?.let { if (!it.airborne) drawBoss(it, k, t) }
     if (g.phase != Phase.GAME_OVER) drawPlayer(g, k)
+    g.boss?.let { if (it.airborne) drawBoss(it, k, t) }
+}
+
+private fun DrawScope.drawBoss(b: Boss, k: Int, t: Float) {
+    if (b.defeated) return
+    val size = 32
+    val x = ((b.x * ART - size / 2f).roundToInt()) * k
+    var y = ((b.y * ART - size / 2f).roundToInt()) * k
+    if (b.airborne) {
+        // Sombra no sítio onde vai aterrar, a crescer; o yeti sobe e desce num arco
+        val p = (b.stateTime / 1.1f).coerceIn(0f, 1f)
+        val sx = ((b.jumpToX * ART).roundToInt()) * k.toFloat()
+        val sy = ((b.jumpToY * ART + 10).roundToInt()) * k.toFloat()
+        val w = (14 + 10 * p) * k
+        drawOval(Color.Black.copy(alpha = 0.25f + 0.25f * p), Offset(sx - w, sy - w * 0.35f), Size(w * 2, w * 0.7f))
+        val lift = (sin(p * PI.toFloat()) * 3.2f * ART).roundToInt() * k
+        y -= lift
+    } else {
+        drawOval(Color.Black.copy(alpha = 0.3f), Offset(x + 4f * k, y + 27f * k), Size(24f * k, 6f * k))
+    }
+    val frame = when (b.kind) {
+        BossKind.YETI -> if (b.airborne || b.state == BossState.STUN && b.stateTime < 0.3f) 1 else (t * 2).toInt()
+        BossKind.SCORPION -> if (b.state == BossState.DASH) 1 else (t * 3).toInt()
+        else -> (t * 3).toInt()
+    }
+    val dyingAlpha = if (b.alive) 1f else 1f - (b.dying / 1.6f).coerceIn(0f, 1f)
+    // Aviso antes da investida e piscar quando é ferido
+    val flash = (b.state == BossState.CHARGE && (t * 16).toInt() % 2 == 0) ||
+        (b.hurt > 0f && (b.hurt * 14f).toInt() % 2 == 0) ||
+        (!b.alive && (b.dying * 12f).toInt() % 2 == 0)
+    val shake = if (b.state == BossState.CHARGE || b.state == BossState.STUN && b.kind == BossKind.SCORPION) ((t * 40).toInt() % 3 - 1) * k else 0
+    sprite(if (flash) Art.bossWhite(b.kind) else Art.boss(b.kind, frame), x + shake, y, k, alpha = dyingAlpha)
+    if (b.state == BossState.STUN) {
+        // Estrelinhas de tonto
+        for (i in 0 until 3) {
+            val a = t * 5f + i * 2.1f
+            val sx = x + (16 + cos(a) * 12).roundToInt() * k
+            val sy = y + (2 + sin(a) * 3).roundToInt() * k
+            drawRect(Color(0xFFFFE35A), Offset(sx.toFloat(), sy.toFloat()), Size(2f * k, 2f * k))
+        }
+    }
 }
 
 private fun DrawScope.drawFlames(g: Game, k: Int) {

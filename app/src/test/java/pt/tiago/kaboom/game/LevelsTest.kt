@@ -19,7 +19,7 @@ class LevelsTest {
             assertEquals("$n: linhas", Game.H, def.rows.size)
             def.rows.forEachIndexed { y, row ->
                 assertEquals("$n linha $y: '$row'", Game.W, row.length)
-                assertTrue("$n linha $y: caracteres desconhecidos em '$row'", row.all { it in "#.BPDbfskrhplEYGCNM" })
+                assertTrue("$n linha $y: caracteres desconhecidos em '$row'", row.all { it in "#.BPDbfskrhplEYGCNMO" })
             }
             for (x in 0 until Game.W) {
                 assertEquals("$n: borda de cima", '#', def.rows[0][x])
@@ -37,8 +37,14 @@ class LevelsTest {
         for ((i, def) in Levels.all.withIndex()) {
             val n = "nível ${i + 1}"
             assertEquals("$n: um 'P'", 1, cells(def, "P").size)
-            assertEquals("$n: uma 'D'", 1, cells(def, "D").size)
-            assertTrue("$n: tem inimigos", cells(def, "EYGCNM").isNotEmpty())
+            if (def.boss != null) {
+                assertEquals("$n: arena com um 'O'", 1, cells(def, "O").size)
+                assertEquals("$n: arena sem 'D' (a porta aparece no fim)", 0, cells(def, "D").size)
+            } else {
+                assertEquals("$n: uma 'D'", 1, cells(def, "D").size)
+                assertEquals("$n: 'O' só nas arenas", 0, cells(def, "O").size)
+                assertTrue("$n: tem inimigos", cells(def, "EYGCNM").isNotEmpty())
+            }
             assertTrue("$n: tem poderes", cells(def, "bfskrhpl").size >= 2)
         }
     }
@@ -47,7 +53,7 @@ class LevelsTest {
     fun inimigosComecamLonge() {
         for ((i, def) in Levels.all.withIndex()) {
             val (px, py) = cells(def, "P").single()
-            for ((ex, ey) in cells(def, "EYGCNM")) {
+            for ((ex, ey) in cells(def, "EYGCNMO")) {
                 assertTrue("nível ${i + 1}: inimigo em ($ex,$ey) perto demais", abs(ex - px) + abs(ey - py) >= 5)
             }
         }
@@ -59,7 +65,7 @@ class LevelsTest {
         for ((i, def) in Levels.all.withIndex()) {
             val start = cells(def, "P").single()
             val seen = flood(def, start) { it != '#' }
-            val open = cells(def, ".BPDbfskrhplEYGCNM")
+            val open = cells(def, ".BPDbfskrhplEYGCNMO")
             val lost = open.filter { it !in seen }
             assertTrue("nível ${i + 1}: casas isoladas $lost", lost.isEmpty())
         }
@@ -105,15 +111,18 @@ class LevelsTest {
     }
 
     @Test
-    fun quatroMundosDeOitoNiveis() {
+    fun quatroMundosDeNoveNiveis() {
         assertEquals(4, Levels.worlds.size)
         Levels.worlds.forEach { assertEquals(it.name, Levels.PER_WORLD, it.levels.size) }
         assertEquals("1-1", Levels.label(1))
-        assertEquals("2-3", Levels.label(11))
-        assertEquals("4-8", Levels.label(32))
-        assertEquals("∞1", Levels.label(33))
-        assertTrue(Levels.isWorldEnd(16))
-        assertEquals("24 é o último do mundo 3 (índice 2)", 2, Levels.worldOf(24))
+        assertEquals("2-3", Levels.label(12))
+        assertEquals("BOSS 1", Levels.label(9))
+        assertEquals("BOSS 4", Levels.label(36))
+        assertEquals("∞1", Levels.label(37))
+        assertEquals("NÍVEL 1-1", Levels.title(1))
+        assertTrue(Levels.isWorldEnd(18))
+        assertEquals(listOf(9, 18, 27, 36), (1..Levels.count).filter { Levels.isBoss(it) })
+        assertEquals("27 é o boss do mundo 3 (índice 2)", 2, Levels.worldOf(27))
     }
 
     @Test

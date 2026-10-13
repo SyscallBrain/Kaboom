@@ -88,7 +88,7 @@ private fun LevelCard(n: Int, def: LevelDef, open: Boolean, onClick: () -> Unit)
             }
         }
         Spacer(Modifier.height(8.dp))
-        Text("NÍVEL ${Levels.label(n)}", style = pixelText(12.sp, if (open) Ui.Gold else Ui.Muted))
+        Text(Levels.title(n), style = pixelText(12.sp, if (open) if (def.boss != null) Ui.Red else Ui.Gold else Ui.Muted))
         Spacer(Modifier.height(6.dp))
         Text(
             if (open) def.name else "BLOQUEADO",
@@ -146,6 +146,12 @@ private fun DrawScope.drawLevelPreview(def: LevelDef, world: Int) {
             c in "BDbfskrhpl" -> sprite(ts.brick, px, py, k)
             c == 'P' -> sprite(Art.hero(Dir.DOWN, 0), px, py, k)
             enemy != null -> sprite(Art.enemy(enemy, 0, false), px, py, k)
+        }
+    }
+    // O boss ocupa 2×2 casas
+    def.boss?.let { kind ->
+        for ((y, row) in def.rows.withIndex()) for ((x, c) in row.withIndex()) {
+            if (c == 'O') sprite(Art.boss(kind, 0), ox + x * tile - tile / 2, oy + y * tile - tile / 2, k)
         }
     }
 }
