@@ -10,6 +10,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -41,6 +42,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -222,6 +224,9 @@ private fun Legend(img: ImageBitmap, text: String) {
 
 // ------------------------------------------------------------------ jogo
 
+/** Altura mínima da zona dos comandos por baixo do tabuleiro. */
+private val MIN_CONTROLS = 200.dp
+
 @Composable
 fun GameScreen(
     startLevel: Int,
@@ -292,32 +297,41 @@ fun GameScreen(
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             Hud(hud, onPause = { paused = true })
-            Box(Modifier.fillMaxWidth().aspectRatio(Game.W.toFloat() / Game.H).background(Ui.Ink)) {
-                Canvas(Modifier.fillMaxSize().clipToBounds()) {
-                    @Suppress("UNUSED_EXPRESSION") frame // redesenha a cada frame
-                    val b = BoardLayout(size.width, size.height)
-                    // O tremor anda em passos de píxel de arte, para não "desfocar" a pixel art
-                    val sh = effects.shakeOffset()
-                    val sx = (sh.x * ART).roundToInt() * b.k
-                    val sy = (sh.y * ART).roundToInt() * b.k
-                    translate((b.ox + sx).toFloat(), (b.oy + sy).toFloat()) {
-                        drawGame(game, b.k)
-                        effects.draw(this, b.k, measurer)
+            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+                // Casas o maior possível, deixando espaço por baixo para os polegares
+                val density = LocalDensity.current
+                val k = with(density) { BoardLayout.scale(maxWidth.toPx(), maxHeight.toPx(), MIN_CONTROLS.toPx()) }
+                val boardHeight = with(density) { (Game.H * ART * k).toDp() }
+                Column(Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxWidth().height(boardHeight).background(Ui.Ink)) {
+                        Canvas(Modifier.fillMaxSize().clipToBounds()) {
+                            @Suppress("UNUSED_EXPRESSION") frame // redesenha a cada frame
+                            val b = BoardLayout(size.width, k)
+                            val ox = b.originX(game.player.x)
+                            // O tremor anda em passos de píxel de arte, para não "desfocar" a pixel art
+                            val sh = effects.shakeOffset()
+                            val sx = (sh.x * ART).roundToInt() * k
+                            val sy = (sh.y * ART).roundToInt() * k
+                            translate((ox + sx).toFloat(), sy.toFloat()) {
+                                drawGame(game, k)
+                                effects.draw(this, k, measurer)
+                            }
+                            drawIris(game, Offset(ox + game.player.x * b.tile, game.player.y * b.tile))
+                        }
+                        if (bossBar != null) BossBar(bossBar.first, bossBar.second, game.boss!!.kind.hp)
+                        if (banner != null) Banner(banner.first, banner.second)
                     }
-                    drawIris(game, Offset(b.ox + game.player.x * b.tile, b.oy + game.player.y * b.tile))
+                    Controls(
+                        Modifier.fillMaxWidth().weight(1f).background(Ui.Night),
+                        scheme = settings.scheme,
+                        leftHanded = settings.leftHanded,
+                        showDetonate = p.remote,
+                        onDir = { d: Dir? -> game.input = d },
+                        onBomb = { game.requestBomb() },
+                        onDetonate = { game.requestDetonate() },
+                    )
                 }
-                if (bossBar != null) BossBar(bossBar.first, bossBar.second, game.boss!!.kind.hp)
-                if (banner != null) Banner(banner.first, banner.second)
             }
-            Controls(
-                Modifier.fillMaxWidth().weight(1f).background(Ui.Night),
-                scheme = settings.scheme,
-                leftHanded = settings.leftHanded,
-                showDetonate = p.remote,
-                onDir = { d: Dir? -> game.input = d },
-                onBomb = { game.requestBomb() },
-                onDetonate = { game.requestDetonate() },
-            )
         }
 
         if (game.phase == Phase.GAME_OVER) {

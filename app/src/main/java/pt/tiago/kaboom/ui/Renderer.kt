@@ -35,11 +35,32 @@ const val ART = 16
  * Onde e a que escala o mapa é desenhado: a maior ampliação inteira que cabe,
  * centrada. Pixel art só fica nítida com ampliações inteiras.
  */
-class BoardLayout(width: Float, height: Float) {
-    val k = max(1, minOf(width / (Game.W * ART), height / (Game.H * ART)).toInt())
+class BoardLayout(private val width: Float, val k: Int) {
     val tile = ART * k
-    val ox = ((width - Game.W * tile) / 2).toInt()
-    val oy = ((height - Game.H * tile) / 2).toInt()
+    private val boardW = Game.W * tile
+
+    /**
+     * Onde começa o tabuleiro no ecrã: centrado se cabe na largura; senão a câmara
+     * segue [focusX] (em casas), sem sair do tabuleiro e sempre em passos de píxel de arte.
+     */
+    fun originX(focusX: Float): Int =
+        if (boardW <= width) ((width - boardW) / 2).toInt()
+        else -(((focusX * tile - width / 2).coerceIn(0f, boardW - width)).roundToInt() / k * k)
+
+    companion object {
+        /** Mínimo de colunas visíveis quando a câmara desliza. */
+        const val MIN_COLS = 11
+
+        /**
+         * A maior ampliação que deixa pelo menos [minControls] px por baixo para os comandos
+         * e mostra pelo menos [MIN_COLS] colunas. Pode não caber na largura: a câmara desliza.
+         */
+        fun scale(width: Float, height: Float, minControls: Float): Int {
+            val byHeight = ((height - minControls) / (Game.H * ART)).toInt()
+            val byWidth = (width / (MIN_COLS * ART)).toInt()
+            return max(1, minOf(byHeight, byWidth))
+        }
+    }
 }
 
 /** Desenha um sprite ampliado [k] vezes, sem suavização. */

@@ -155,7 +155,7 @@ fun Controls(
 /** Botão do detonador: acima do da bomba, puxado para o meio do ecrã. */
 private fun detonateCenter(w: Float, h: Float, bombR: Float, leftHanded: Boolean): Offset {
     val bombX = if (leftHanded) bombR * 1.6f else w - bombR * 1.6f
-    return Offset(bombX + (if (leftHanded) 1 else -1) * bombR * 0.9f, h * 0.55f - bombR * 1.9f)
+    return Offset(bombX + (if (leftHanded) 1 else -1) * bombR * 1.5f, h * 0.55f - bombR * 1.3f)
 }
 
 private fun DrawScope.drawDetonateButton(c: Offset, r: Float, down: Boolean) {
