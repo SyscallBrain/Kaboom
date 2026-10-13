@@ -14,15 +14,16 @@ import kotlin.random.Random
 object Synth {
     const val RATE = 22050
 
+    // Tons acima de ~600 Hz: o altifalante de um telemóvel quase não reproduz graves.
     fun forEvent(e: GameEvent): FloatArray = when (e) {
-        GameEvent.BOMB_PLACED -> sweep(420f, 240f, 0.09f, 0.28f)
+        GameEvent.BOMB_PLACED -> sweep(1100f, 620f, 0.12f, 0.45f)
         GameEvent.EXPLOSION -> explosion()
-        GameEvent.ITEM -> notes(floatArrayOf(660f, 880f, 1320f, 1760f), 0.055f, 0.22f)
-        GameEvent.ENEMY_DIED -> sweep(300f, 1100f, 0.16f, 0.22f)
-        GameEvent.PLAYER_DIED -> sweep(900f, 70f, 0.95f, 0.28f, vibrato = true)
-        GameEvent.DOOR_OPEN -> notes(floatArrayOf(784f, 1046f, 1318f), 0.09f, 0.22f)
-        GameEvent.LEVEL_CLEAR -> notes(floatArrayOf(523f, 659f, 784f, 1046f, 784f, 1046f, 1318f), 0.11f, 0.22f)
-        GameEvent.GAME_OVER -> notes(floatArrayOf(392f, 370f, 349f, 262f), 0.28f, 0.22f)
+        GameEvent.ITEM -> notes(floatArrayOf(880f, 1175f, 1568f, 2093f), 0.06f, 0.4f)
+        GameEvent.ENEMY_DIED -> sweep(600f, 1800f, 0.18f, 0.4f)
+        GameEvent.PLAYER_DIED -> sweep(1400f, 200f, 0.95f, 0.45f, vibrato = true)
+        GameEvent.DOOR_OPEN -> notes(floatArrayOf(1046f, 1318f, 1568f), 0.1f, 0.4f)
+        GameEvent.LEVEL_CLEAR -> notes(floatArrayOf(784f, 988f, 1175f, 1568f, 1175f, 1568f, 1976f), 0.11f, 0.4f)
+        GameEvent.GAME_OVER -> notes(floatArrayOf(784f, 740f, 698f, 523f), 0.28f, 0.4f)
     }
 
     private fun square(phase: Double) = if (sin(phase) >= 0) 1f else -1f

@@ -148,18 +148,22 @@ fun GameScreen(feedback: Feedback, onGameOver: (score: Int, level: Int) -> Unit,
         }
     }
 
-    // Ler o frame aqui faz o HUD e os avisos actualizarem-se a cada frame.
+    // O Compose não vê mudanças dentro do objecto Game (é sempre a mesma instância),
+    // por isso o HUD e os avisos recebem valores simples, lidos a cada frame.
     @Suppress("UNUSED_VARIABLE") val tick = frame
+    val p = game.player
+    val hud = HudState(game.lives, game.level, p.maxBombs, p.range, p.speedUps, game.score)
+    val banner = bannerFor(game)
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            Hud(game, onPause = { paused = true })
+            Hud(hud, onPause = { paused = true })
             Box(Modifier.fillMaxWidth().aspectRatio(Game.W.toFloat() / Game.H)) {
                 Canvas(Modifier.fillMaxSize()) {
                     @Suppress("UNUSED_EXPRESSION") frame // redesenha a cada frame
                     drawGame(game)
                 }
-                Banner(game)
+                if (banner != null) Banner(banner.first, banner.second)
             }
             Controls(
                 Modifier.fillMaxWidth().weight(1f).background(Color(0xFF0F172A)),
@@ -200,8 +204,7 @@ fun GameScreen(feedback: Feedback, onGameOver: (score: Int, level: Int) -> Unit,
 }
 
 @Composable
-private fun Hud(game: Game, onPause: () -> Unit) {
-    val p = game.player
+private fun Hud(h: HudState, onPause: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -210,10 +213,10 @@ private fun Hud(game: Game, onPause: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        HudText("❤️ ${game.lives}")
-        HudText("NÍVEL ${game.level}", Gold)
-        HudText("💣${p.maxBombs} 🔥${p.range} ⚡${p.speedUps}")
-        HudText("${game.score}", Color.White)
+        HudText("❤️ ${h.lives}")
+        HudText("NÍVEL ${h.level}", Gold)
+        HudText("💣${h.bombs} 🔥${h.range} ⚡${h.speed}")
+        HudText("${h.score}", Color.White)
         Box(
             Modifier
                 .size(40.dp)
@@ -230,29 +233,18 @@ private fun HudText(text: String, color: Color = Color(0xFFE2E8F0)) {
     Text(text, color = color, fontSize = 17.sp, fontWeight = FontWeight.Bold)
 }
 
+private data class HudState(val lives: Int, val level: Int, val bombs: Int, val range: Int, val speed: Int, val score: Int)
+
+/** Título e subtítulo do aviso a mostrar por cima do mapa, ou null se não houver. */
+private fun bannerFor(game: Game): Pair<String, String>? = when {
+    game.phase == Phase.START -> "NÍVEL ${game.level}" to "Prepara-te!"
+    game.phase == Phase.LEVEL_CLEAR -> "NÍVEL CONCLUÍDO!" to "+${500 + 100 * game.level} pontos"
+    game.phase == Phase.PLAYING && game.time - game.doorOpenedAt < 2.2f -> "A PORTA ABRIU!" to "Encontra a saída"
+    else -> null
+}
+
 @Composable
-private fun Banner(game: Game) {
-    val text: String?
-    val sub: String?
-    when {
-        game.phase == Phase.START -> {
-            text = "NÍVEL ${game.level}"
-            sub = "Prepara-te!"
-        }
-        game.phase == Phase.LEVEL_CLEAR -> {
-            text = "NÍVEL CONCLUÍDO!"
-            sub = "+${500 + 100 * game.level} pontos"
-        }
-        game.phase == Phase.PLAYING && game.time - game.doorOpenedAt < 2.2f -> {
-            text = "A PORTA ABRIU!"
-            sub = "Encontra a saída"
-        }
-        else -> {
-            text = null
-            sub = null
-        }
-    }
-    if (text == null) return
+private fun Banner(text: String, sub: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             Modifier
@@ -262,7 +254,7 @@ private fun Banner(game: Game) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(text, style = bigTitle.copy(fontSize = 34.sp))
-            if (sub != null) Text(sub, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(sub, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
