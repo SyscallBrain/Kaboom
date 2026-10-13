@@ -1,0 +1,27 @@
+# Build outputs
+build/
+*.apk
+*.aab
+
+# Gradle
+.gradle/
+local.properties
+
+# IDE
+.idea/
+*.iml
+captures/
+
+# Signing
+*.keystore
+*.jks
+keystore.properties
+
+# Scratch das skills superpowers (ledger, briefs, mockups)
+.superpowers/
+
+# Log do ciclo de build (saida de ./gradlew, lida pelo EXIT=)
+build.log
+
+# OS
+.DS_Store
