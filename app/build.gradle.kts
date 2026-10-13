@@ -13,8 +13,29 @@ android {
         applicationId = "pt.tiago.kaboom"
         minSdk = 26
         targetSdk = 36
-        versionCode = 12
-        versionName = "0.7.3"
+        versionCode = 13
+        versionName = "1.0.0"
+    }
+
+    // Assinatura do APK publicado: a chave e as passwords ficam fora do repositório,
+    // em ~/.gradle/gradle.properties (KABOOM_STORE_FILE, KABOOM_STORE_PASSWORD,
+    // KABOOM_KEY_ALIAS, KABOOM_KEY_PASSWORD). Sem elas, o release sai por assinar.
+    val storeFile = providers.gradleProperty("KABOOM_STORE_FILE").orNull
+    signingConfigs {
+        if (storeFile != null) {
+            create("release") {
+                this.storeFile = file(storeFile)
+                storePassword = providers.gradleProperty("KABOOM_STORE_PASSWORD").get()
+                keyAlias = providers.gradleProperty("KABOOM_KEY_ALIAS").get()
+                keyPassword = providers.gradleProperty("KABOOM_KEY_PASSWORD").get()
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (storeFile != null) signingConfig = signingConfigs.getByName("release")
+        }
     }
 
     compileOptions {
