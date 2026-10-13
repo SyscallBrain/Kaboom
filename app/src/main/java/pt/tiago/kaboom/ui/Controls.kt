@@ -71,18 +71,26 @@ fun Controls(
             awaitPointerEventScope {
                 val isPad = HashMap<PointerId, Boolean>()
                 val isDetonate = HashSet<PointerId>()
+                val isBomb = HashSet<PointerId>()
                 while (true) {
                     val ev = awaitPointerEvent()
                     val split = size.width * 0.5f
                     for (c in ev.changes) {
                         if (c.changedToDown()) {
-                            val pad = (c.position.x < split) != leftNow
+                            // Só os botões em si largam a bomba / detonam.
+                            val w = size.width.toFloat()
+                            val h = size.height.toFloat()
+                            val det = detonateCenter(w, h, bombR, leftNow)
+                            val onDetonate = detonateNow && (c.position - det).getDistance() < bombR * 0.62f * 1.1f
+                            val onBomb = !onDetonate && (c.position - bombCenter(w, h, bombR, leftNow)).getDistance() < bombR * 1.1f
+                            // O resto da metade do joystick é para andar; fora dos botões, do outro lado, não faz nada
+                            val pad = !onBomb && !onDetonate && (c.position.x < split) != leftNow
                             isPad[c.id] = pad
-                            val det = detonateCenter(size.width.toFloat(), size.height.toFloat(), bombR, leftNow)
-                            if (!pad && detonateNow && (c.position - det).getDistance() < bombR * 0.95f) {
+                            if (onDetonate) {
                                 isDetonate += c.id
                                 detonateCb()
-                            } else if (!pad) {
+                            } else if (onBomb) {
+                                isBomb += c.id
                                 bombCb()
                             }
                             if (pad && schemeNow == ControlScheme.FLOATING) origin = c.position
@@ -90,10 +98,11 @@ fun Controls(
                         if (!c.pressed) {
                             isPad.remove(c.id)
                             isDetonate.remove(c.id)
+                            isBomb.remove(c.id)
                         }
                         c.consume()
                     }
-                    bombDown = ev.changes.any { it.pressed && isPad[it.id] == false && it.id !in isDetonate }
+                    bombDown = ev.changes.any { it.pressed && it.id in isBomb }
                     detonateDown = ev.changes.any { it.pressed && it.id in isDetonate }
                     val finger = ev.changes.firstOrNull { it.pressed && isPad[it.id] == true }
 
@@ -146,11 +155,13 @@ fun Controls(
                 }
             }
         }
-        val bombX = if (leftHanded) bombR * 1.6f else size.width - bombR * 1.6f
-        drawBombButton(Offset(bombX, size.height * 0.55f), bombR, bombDown)
+        drawBombButton(bombCenter(size.width, size.height, bombR, leftHanded), bombR, bombDown)
         if (showDetonate) drawDetonateButton(detonateCenter(size.width, size.height, bombR, leftHanded), bombR * 0.62f, detonateDown)
     }
 }
+
+private fun bombCenter(w: Float, h: Float, bombR: Float, leftHanded: Boolean) =
+    Offset(if (leftHanded) bombR * 1.6f else w - bombR * 1.6f, h * 0.55f)
 
 /** Botão do detonador: acima do da bomba, puxado para o meio do ecrã. */
 private fun detonateCenter(w: Float, h: Float, bombR: Float, leftHanded: Boolean): Offset {
