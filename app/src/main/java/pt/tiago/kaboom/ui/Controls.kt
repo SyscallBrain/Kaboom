@@ -22,6 +22,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import pt.tiago.kaboom.game.Dir
+import pt.tiago.kaboom.ui.pixel.Art
 import kotlin.math.abs
 
 enum class ControlScheme(val short: String) {
@@ -188,7 +189,10 @@ private fun DrawScope.drawDpad(c: Offset, r: Float, active: Dir?) {
 private fun DrawScope.drawBombButton(c: Offset, r: Float, down: Boolean) {
     val press = if (down) 0.92f else 1f
     drawCircle(Color.Black.copy(alpha = 0.4f), r, c + Offset(0f, r * 0.1f))
-    drawCircle(if (down) Color(0xFFB91C1C) else Color(0xFFDC2626), r * press, c)
+    drawCircle(if (down) Color(0xFF9E2A1C) else Ui.Red, r * press, c)
     drawCircle(Color.White.copy(alpha = 0.25f), r * press, c, style = Stroke(r * 0.05f))
-    drawBomb(c.x, c.y, r * 1.05f * press, 0f, 0f)
+    // Sprite da bomba ampliado por um inteiro, para ficar nítido
+    val k = (r * 1.25f / ART).toInt().coerceAtLeast(1)
+    val half = ART * k / 2
+    sprite(Art.bomb[0], (c.x - half).toInt(), (c.y - half).toInt(), k, scale = press)
 }

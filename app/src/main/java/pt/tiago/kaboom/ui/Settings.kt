@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -80,12 +78,12 @@ fun SettingsScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .background(Color(0xF20F172A))
+            .background(Ui.Night)
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
-        Text("DEFINIÇÕES", color = Color(0xFFFACC15), fontSize = 32.sp, fontWeight = FontWeight.Black)
+        Text("DEFINIÇÕES", style = pixelTitle(22.sp))
 
         Section("🔊 Volume do som: ${(settings.volume * 100).toInt()}%") {
             Slider(
@@ -114,11 +112,7 @@ fun SettingsScreen(
             Switch(settings.leftHanded, { onChange(settings.copy(leftHanded = it)) })
         }
         Spacer(Modifier.height(4.dp))
-        Button(
-            onClick = onBack,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF97316)),
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-        ) { Text("Voltar", fontSize = 20.sp, fontWeight = FontWeight.Black) }
+        PixelButton("VOLTAR", Modifier.fillMaxWidth(), primary = true, onClick = onBack)
     }
 }
 

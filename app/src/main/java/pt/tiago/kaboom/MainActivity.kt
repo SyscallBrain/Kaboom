@@ -30,6 +30,7 @@ import pt.tiago.kaboom.ui.GameScreen
 import pt.tiago.kaboom.ui.Settings
 import pt.tiago.kaboom.ui.SettingsScreen
 import pt.tiago.kaboom.ui.TitleScreen
+import pt.tiago.kaboom.ui.Ui
 
 class MainActivity : ComponentActivity() {
     private lateinit var feedback: Feedback
@@ -56,11 +57,11 @@ class MainActivity : ComponentActivity() {
                 s.save(prefs)
             }
 
-            MaterialTheme(colorScheme = darkColorScheme(primary = Color(0xFFF97316))) {
+            MaterialTheme(colorScheme = darkColorScheme(primary = Ui.Orange, surface = Ui.Panel)) {
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(Color(0xFF0F172A))
+                        .background(Ui.Night)
                         .windowInsetsPadding(WindowInsets.safeDrawing),
                 ) {
                     if (playing) {

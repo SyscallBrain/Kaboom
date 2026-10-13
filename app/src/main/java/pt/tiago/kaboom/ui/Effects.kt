@@ -8,15 +8,24 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import pt.tiago.kaboom.game.Fx
 import pt.tiago.kaboom.game.FxKind
+import pt.tiago.kaboom.ui.pixel.PixelFont
 import kotlin.math.cos
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
+
+// Cores da paleta 16 bits
+private val FlameYellow = Color(0xFFFFE35A)
+private val FlameOrange = Color(0xFFFF7A1A)
+private val Brick = Color(0xFFC8582A)
+private val Mortar = Color(0xFF6E2614)
+private val Gold = Color(0xFFFFCF3A)
+private val Smoke = Color(0xFF8E8AA6)
 
 /**
  * Efeitos só visuais (partículas, pontos a flutuar, tremor do ecrã). Ficam fora da lógica
@@ -56,8 +65,8 @@ class Effects {
         for (f in list) when (f.kind) {
             FxKind.EXPLOSION -> {
                 shake = min(shake + 0.35f, 0.6f)
-                repeat(12) { burst(f, speed = 2f + rnd.nextFloat() * 3.5f, life = 0.25f + rnd.nextFloat() * 0.3f, color = if (rnd.nextBoolean()) Pal.flameMid else Pal.flameOuter, size = 0.06f + rnd.nextFloat() * 0.06f, gravity = 0f, square = false) }
-                repeat(5) { burst(f, speed = 0.6f, life = 0.7f, color = Color(0xFF6B7280), size = 0.14f, gravity = -1.2f, square = false) } // fumo
+                repeat(12) { burst(f, speed = 2f + rnd.nextFloat() * 3.5f, life = 0.25f + rnd.nextFloat() * 0.3f, color = if (rnd.nextBoolean()) FlameYellow else FlameOrange, size = 0.06f + rnd.nextFloat() * 0.06f, gravity = 0f, square = false) }
+                repeat(5) { burst(f, speed = 0.6f, life = 0.7f, color = Smoke, size = 0.14f, gravity = -1.2f, square = false) } // fumo
             }
             FxKind.BLOCK_BROKEN -> repeat(8) {
                 parts += Particle(
@@ -66,7 +75,7 @@ class Effects {
                     (rnd.nextFloat() - 0.5f) * 4f,
                     -1.5f - rnd.nextFloat() * 2.5f,
                     0.55f + rnd.nextFloat() * 0.3f,
-                    if (rnd.nextBoolean()) Pal.brick else Pal.mortar,
+                    if (rnd.nextBoolean()) Brick else Mortar,
                     0.1f + rnd.nextFloat() * 0.1f,
                     gravity = 11f,
                     square = true,
@@ -74,7 +83,7 @@ class Effects {
             }
             FxKind.ITEM -> repeat(14) { i ->
                 val a = i / 14f * 6.2832f
-                parts += Particle(f.x, f.y, cos(a) * 2.6f, sin(a) * 2.6f, 0.45f, if (i % 2 == 0) Color.White else Pal.helmet, 0.07f, 0f, false)
+                parts += Particle(f.x, f.y, cos(a) * 2.6f, sin(a) * 2.6f, 0.45f, if (i % 2 == 0) Color.White else Gold, 0.07f, 0f, false)
             }
             FxKind.SCORE -> popups += Popup(f.x, f.y, "+${f.value}")
         }
@@ -121,30 +130,30 @@ class Effects {
         shake = 0f
     }
 
-    fun draw(scope: DrawScope, s: Float, measurer: TextMeasurer) = with(scope) {
+    /**
+     * Desenha em pixel art: cada partícula é um quadrado de 1 ou 2 píxeis de arte,
+     * alinhado à grelha, e os pontos usam a letra pixel. [k] = ampliação da arte.
+     */
+    fun draw(scope: DrawScope, k: Int, measurer: TextMeasurer) = with(scope) {
         for (p in parts) {
-            val k = 1f - p.age / p.life
-            val r = p.size * s * (if (p.square) 1f else 0.5f + 0.5f * k)
-            if (p.square) {
-                drawRect(p.color, Offset(p.x * s - r / 2, p.y * s - r / 2), Size(r, r), alpha = k.coerceIn(0f, 1f))
-            } else {
-                drawCircle(p.color, r, Offset(p.x * s, p.y * s), alpha = (k * 0.9f).coerceIn(0f, 1f))
-            }
+            val life = 1f - p.age / p.life
+            val px = if (p.square || life > 0.5f) (p.size * 16f).roundToInt().coerceAtLeast(1) else 1
+            val x = (p.x * 16f - px / 2f).roundToInt() * k
+            val y = (p.y * 16f - px / 2f).roundToInt() * k
+            drawRect(p.color, Offset(x.toFloat(), y.toFloat()), Size((px * k).toFloat(), (px * k).toFloat()), alpha = life.coerceIn(0f, 1f))
         }
         val style = TextStyle(
             color = Color.White,
-            fontSize = (s * 0.32f / (density * fontScale)).sp,
-            fontWeight = FontWeight.Black,
-            shadow = Shadow(Color.Black, Offset(2f, 3f), 2f),
+            fontFamily = PixelFont,
+            fontSize = (6f * k / (density * fontScale)).sp,
+            shadow = Shadow(Color(0xFF1D1430), Offset(k.toFloat(), k.toFloat()), 0f),
         )
         for (p in popups) {
-            val k = 1f - p.age / 0.9f
+            val life = 1f - p.age / 0.9f
             val layout = measurer.measure(p.text, style)
-            drawText(
-                layout,
-                topLeft = Offset(p.x * s - layout.size.width / 2f, p.y * s - layout.size.height / 2f),
-                alpha = (k * 1.6f).coerceIn(0f, 1f),
-            )
+            val x = (p.x * 16f).roundToInt() * k - layout.size.width / 2
+            val y = (p.y * 16f).roundToInt() * k - layout.size.height / 2
+            drawText(layout, topLeft = Offset(x.toFloat(), y.toFloat()), alpha = (life * 1.6f).coerceIn(0f, 1f))
         }
     }
 }
