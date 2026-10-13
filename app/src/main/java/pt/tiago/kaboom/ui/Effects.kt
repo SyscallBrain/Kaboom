@@ -15,6 +15,7 @@ import pt.tiago.kaboom.game.FxKind
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
@@ -48,10 +49,13 @@ class Effects {
     /** Segundos de tremor que faltam. */
     private var shake = 0f
 
+    /** Força do tremor escolhida nas definições. */
+    var shakeLevel = Level.MEDIUM
+
     fun consume(list: List<Fx>) {
         for (f in list) when (f.kind) {
             FxKind.EXPLOSION -> {
-                shake = min(shake + 0.2f, 0.4f)
+                shake = min(shake + 0.35f, 0.6f)
                 repeat(12) { burst(f, speed = 2f + rnd.nextFloat() * 3.5f, life = 0.25f + rnd.nextFloat() * 0.3f, color = if (rnd.nextBoolean()) Pal.flameMid else Pal.flameOuter, size = 0.06f + rnd.nextFloat() * 0.06f, gravity = 0f, square = false) }
                 repeat(5) { burst(f, speed = 0.6f, life = 0.7f, color = Color(0xFF6B7280), size = 0.14f, gravity = -1.2f, square = false) } // fumo
             }
@@ -100,7 +104,14 @@ class Effects {
     /** Deslocamento do mapa (em casas) para o tremor das explosões. */
     fun shakeOffset(): Offset {
         if (shake <= 0f) return Offset.Zero
-        val a = 0.13f * (shake / 0.4f)
+        val strength = when (shakeLevel) {
+            Level.OFF -> return Offset.Zero
+            Level.LOW -> 0.12f
+            Level.MEDIUM -> 0.24f
+            Level.HIGH -> 0.4f
+        }
+        // Diminui devagar no início e depressa no fim, para se sentir o "impacto".
+        val a = strength * sqrt(shake / 0.6f)
         return Offset((rnd.nextFloat() * 2 - 1) * a, (rnd.nextFloat() * 2 - 1) * a)
     }
 

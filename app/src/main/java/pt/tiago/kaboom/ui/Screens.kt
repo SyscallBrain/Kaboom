@@ -69,13 +69,7 @@ private val bigTitle = TextStyle(
 )
 
 @Composable
-fun TitleScreen(
-    best: Int,
-    bestLevel: Int,
-    scheme: ControlScheme,
-    onSchemeChange: (ControlScheme) -> Unit,
-    onPlay: () -> Unit,
-) {
+fun TitleScreen(best: Int, bestLevel: Int, onSettings: () -> Unit, onPlay: () -> Unit) {
     val anim = rememberInfiniteTransition(label = "title")
     val t by anim.animateFloat(0f, 100f, infiniteRepeatable(tween(100_000, easing = LinearEasing)), label = "t")
     Column(
@@ -107,7 +101,7 @@ fun TitleScreen(
             Text("JOGAR", fontSize = 26.sp, fontWeight = FontWeight.Black)
         }
         Spacer(Modifier.height(12.dp))
-        SchemeButton(scheme, onSchemeChange)
+        OutlinedButton(onClick = onSettings, modifier = Modifier.width(220.dp)) { Text("⚙ Definições", fontSize = 17.sp) }
         Spacer(Modifier.height(28.dp))
         if (best > 0) {
             Text("🏆 Recorde: $best", color = Gold, fontSize = 20.sp, fontWeight = FontWeight.Bold)
@@ -133,8 +127,8 @@ private fun Legend(icon: String, text: String) {
 @Composable
 fun GameScreen(
     feedback: Feedback,
-    scheme: ControlScheme,
-    onSchemeChange: (ControlScheme) -> Unit,
+    settings: Settings,
+    onSettingsChange: (Settings) -> Unit,
     onGameOver: (score: Int, level: Int) -> Unit,
     onExit: () -> Unit,
 ) {
@@ -143,7 +137,8 @@ fun GameScreen(
     val measurer = rememberTextMeasurer()
     var frame by remember { mutableLongStateOf(0L) }
     var paused by remember { mutableStateOf(false) }
-    var soundOn by remember { mutableStateOf(feedback.soundOn) }
+    var showSettings by remember { mutableStateOf(false) }
+    effects.shakeLevel = settings.shake
 
     LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { paused = true }
     BackHandler { paused = !paused }
@@ -195,7 +190,8 @@ fun GameScreen(
             }
             Controls(
                 Modifier.fillMaxWidth().weight(1f).background(Color(0xFF0F172A)),
-                scheme = scheme,
+                scheme = settings.scheme,
+                leftHanded = settings.leftHanded,
                 onDir = { d: Dir? -> game.input = d },
                 onBomb = { game.requestBomb() },
             )
@@ -221,29 +217,24 @@ fun GameScreen(
                 Spacer(Modifier.height(28.dp))
                 BigButton("Continuar") { paused = false }
                 Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = {
-                        soundOn = !soundOn
-                        feedback.soundOn = soundOn
-                    },
-                    modifier = Modifier.width(240.dp),
-                ) { Text(if (soundOn) "🔊 Som ligado" else "🔇 Som desligado", fontSize = 18.sp) }
-                Spacer(Modifier.height(12.dp))
-                SchemeButton(scheme, onSchemeChange)
+                OutlinedButton(onClick = { showSettings = true }, modifier = Modifier.width(240.dp)) {
+                    Text("⚙ Definições", fontSize = 18.sp)
+                }
                 Spacer(Modifier.height(12.dp))
                 OutlinedButton(onClick = onExit, modifier = Modifier.width(240.dp)) { Text("Sair para o menu", fontSize = 18.sp) }
             }
         }
+        if (showSettings) {
+            BackHandler { showSettings = false }
+            SettingsScreen(
+                settings = settings,
+                onChange = onSettingsChange,
+                onPreviewSound = feedback::previewSound,
+                onPreviewVibration = feedback::previewVibration,
+                onBack = { showSettings = false },
+            )
+        }
     }
-}
-
-/** Alterna entre os esquemas de controlo. */
-@Composable
-private fun SchemeButton(scheme: ControlScheme, onChange: (ControlScheme) -> Unit) {
-    OutlinedButton(
-        onClick = { onChange(ControlScheme.entries[(scheme.ordinal + 1) % ControlScheme.entries.size]) },
-        modifier = Modifier.width(240.dp),
-    ) { Text("🎮 ${scheme.label}", fontSize = 17.sp) }
 }
 
 @Composable

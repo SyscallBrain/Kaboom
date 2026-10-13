@@ -8,11 +8,13 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import pt.tiago.kaboom.game.GameEvent
+import pt.tiago.kaboom.ui.Level
 import java.io.File
 
 /** Som e vibração para os eventos do jogo. */
 class Feedback(context: Context) {
-    var soundOn = true
+    var volume = 0.8f
+    var vibration = Level.MEDIUM
 
     private val pool = SoundPool.Builder()
         .setMaxStreams(10)
@@ -44,19 +46,41 @@ class Feedback(context: Context) {
     }
 
     fun on(e: GameEvent) {
-        if (soundOn) sounds[e]?.let { pool.play(it, 1f, 1f, 1, 0, 1f) }
+        playSound(e)
+        vibrate(e)
+    }
+
+    /** Para as definições: ouvir o volume escolhido. */
+    fun previewSound() = playSound(GameEvent.ITEM)
+
+    /** Para as definições: sentir a força de vibração escolhida. */
+    fun previewVibration() = vibrate(GameEvent.EXPLOSION)
+
+    private fun playSound(e: GameEvent) {
+        if (volume > 0f) sounds[e]?.let { pool.play(it, volume, volume, 1, 0, 1f) }
+    }
+
+    private fun vibrate(e: GameEvent) {
         val v = vibrator ?: return
-        if (e == GameEvent.BOMB_PLACED && Build.VERSION.SDK_INT >= 29) {
+        if (vibration == Level.OFF) return
+        if (e == GameEvent.BOMB_PLACED) {
             // Um "clique" curto ao pôr a bomba, para se sentir o botão
-            v.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+            if (Build.VERSION.SDK_INT >= 29) v.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
             return
         }
-        val ms = when (e) {
-            GameEvent.EXPLOSION -> 45L
+        val base = when (e) {
+            GameEvent.EXPLOSION -> 50L
             GameEvent.PLAYER_DIED -> 300L
             else -> return
         }
-        v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
+        // Força = amplitude (se o telemóvel a suportar) e duração.
+        val (amp, scale) = when (vibration) {
+            Level.LOW -> 70 to 0.7f
+            Level.MEDIUM -> 160 to 1f
+            else -> 255 to 1.6f
+        }
+        val amplitude = if (v.hasAmplitudeControl()) amp else VibrationEffect.DEFAULT_AMPLITUDE
+        v.vibrate(VibrationEffect.createOneShot((base * scale).toLong(), amplitude))
     }
 
     fun release() = pool.release()

@@ -24,13 +24,13 @@ import androidx.compose.ui.unit.dp
 import pt.tiago.kaboom.game.Dir
 import kotlin.math.abs
 
-enum class ControlScheme(val label: String) {
+enum class ControlScheme(val short: String) {
     DPAD("Cruz clássica"),
     FLOATING("Joystick flutuante"),
 }
 
 /**
- * Metade esquerda: direcção. Metade direita: bomba. Multitoque.
+ * Metade esquerda: direcção. Metade direita: bomba (trocadas com [leftHanded]). Multitoque.
  *
  * - [ControlScheme.DPAD]: cruz pequena e fixa; o dedo pode tocar em qualquer sítio da metade
  *   esquerda, a direcção conta-se a partir do centro da cruz.
@@ -38,10 +38,17 @@ enum class ControlScheme(val label: String) {
  *   se o dedo for longe demais — nunca é preciso "procurar" o controlo.
  */
 @Composable
-fun Controls(modifier: Modifier, scheme: ControlScheme, onDir: (Dir?) -> Unit, onBomb: () -> Unit) {
+fun Controls(
+    modifier: Modifier,
+    scheme: ControlScheme,
+    leftHanded: Boolean,
+    onDir: (Dir?) -> Unit,
+    onBomb: () -> Unit,
+) {
     val dirCb by rememberUpdatedState(onDir)
     val bombCb by rememberUpdatedState(onBomb)
     val schemeNow by rememberUpdatedState(scheme)
+    val leftNow by rememberUpdatedState(leftHanded)
     val density = LocalDensity.current
     val padR = with(density) { 62.dp.toPx() }
     val stickR = with(density) { 46.dp.toPx() }
@@ -61,7 +68,7 @@ fun Controls(modifier: Modifier, scheme: ControlScheme, onDir: (Dir?) -> Unit, o
                     val split = size.width * 0.5f
                     for (c in ev.changes) {
                         if (c.changedToDown()) {
-                            val pad = c.position.x < split
+                            val pad = (c.position.x < split) != leftNow
                             isPad[c.id] = pad
                             if (!pad) bombCb()
                             if (pad && schemeNow == ControlScheme.FLOATING) origin = c.position
@@ -82,7 +89,7 @@ fun Controls(modifier: Modifier, scheme: ControlScheme, onDir: (Dir?) -> Unit, o
                         val center = if (floating) {
                             origin ?: finger.position
                         } else {
-                            padCenter(size.width.toFloat(), size.height.toFloat(), padR)
+                            padCenter(size.width.toFloat(), size.height.toFloat(), padR, leftNow)
                         }
                         var v = finger.position - center
                         val d = v.getDistance()
@@ -104,12 +111,12 @@ fun Controls(modifier: Modifier, scheme: ControlScheme, onDir: (Dir?) -> Unit, o
         },
     ) {
         when (scheme) {
-            ControlScheme.DPAD -> drawDpad(padCenter(size.width, size.height, padR), padR, active)
+            ControlScheme.DPAD -> drawDpad(padCenter(size.width, size.height, padR, leftHanded), padR, active)
             ControlScheme.FLOATING -> {
                 val c = origin
                 if (c == null) {
                     // Sugestão discreta de onde pôr o polegar
-                    val hint = padCenter(size.width, size.height, padR)
+                    val hint = padCenter(size.width, size.height, padR, leftHanded)
                     drawCircle(Color.White.copy(alpha = 0.06f), stickR, hint)
                     drawCircle(Color.White.copy(alpha = 0.18f), stickR, hint, style = Stroke(stickR * 0.04f))
                     drawCircle(Color.White.copy(alpha = 0.15f), stickR * 0.45f, hint)
@@ -121,11 +128,13 @@ fun Controls(modifier: Modifier, scheme: ControlScheme, onDir: (Dir?) -> Unit, o
                 }
             }
         }
-        drawBombButton(Offset(size.width - bombR * 1.6f, size.height * 0.55f), bombR, bombDown)
+        val bombX = if (leftHanded) bombR * 1.6f else size.width - bombR * 1.6f
+        drawBombButton(Offset(bombX, size.height * 0.55f), bombR, bombDown)
     }
 }
 
-private fun padCenter(w: Float, h: Float, r: Float) = Offset(r * 1.6f, h * 0.55f)
+private fun padCenter(w: Float, h: Float, r: Float, leftHanded: Boolean) =
+    Offset(if (leftHanded) w - r * 1.6f else r * 1.6f, h * 0.55f)
 
 /** Eixo dominante, com histerese para não "tremer" nas diagonais. */
 private fun pickDir(v: Offset, dead: Float, current: Dir?): Dir? {

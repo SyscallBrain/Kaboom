@@ -25,8 +25,10 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import pt.tiago.kaboom.audio.Feedback
-import pt.tiago.kaboom.ui.ControlScheme
+import androidx.activity.compose.BackHandler
 import pt.tiago.kaboom.ui.GameScreen
+import pt.tiago.kaboom.ui.Settings
+import pt.tiago.kaboom.ui.SettingsScreen
 import pt.tiago.kaboom.ui.TitleScreen
 
 class MainActivity : ComponentActivity() {
@@ -39,21 +41,19 @@ class MainActivity : ComponentActivity() {
         hideSystemBars()
 
         val prefs = getSharedPreferences("kaboom", MODE_PRIVATE)
-        feedback = Feedback(this).apply { soundOn = prefs.getBoolean("sound", true) }
+        feedback = Feedback(this)
 
         setContent {
             var playing by remember { mutableStateOf(false) }
             var best by remember { mutableIntStateOf(prefs.getInt("best", 0)) }
             var bestLevel by remember { mutableIntStateOf(prefs.getInt("bestLevel", 0)) }
-            var scheme by remember {
-                mutableStateOf(
-                    ControlScheme.entries.firstOrNull { it.name == prefs.getString("controls", null) }
-                        ?: ControlScheme.DPAD,
-                )
-            }
-            val changeScheme = { c: ControlScheme ->
-                scheme = c
-                prefs.edit { putString("controls", c.name) }
+            var showSettings by remember { mutableStateOf(false) }
+            var settings by remember { mutableStateOf(Settings.load(prefs)) }
+            feedback.volume = settings.volume
+            feedback.vibration = settings.vibration
+            val changeSettings = { s: Settings ->
+                settings = s
+                s.save(prefs)
             }
 
             MaterialTheme(colorScheme = darkColorScheme(primary = Color(0xFFF97316))) {
@@ -66,8 +66,8 @@ class MainActivity : ComponentActivity() {
                     if (playing) {
                         GameScreen(
                             feedback = feedback,
-                            scheme = scheme,
-                            onSchemeChange = changeScheme,
+                            settings = settings,
+                            onSettingsChange = changeSettings,
                             onGameOver = { score, level ->
                                 if (score > best) best = score
                                 if (level > bestLevel) bestLevel = level
@@ -76,13 +76,20 @@ class MainActivity : ComponentActivity() {
                                     putInt("bestLevel", bestLevel)
                                 }
                             },
-                            onExit = {
-                                prefs.edit { putBoolean("sound", feedback.soundOn) }
-                                playing = false
-                            },
+                            onExit = { playing = false },
                         )
                     } else {
-                        TitleScreen(best, bestLevel, scheme, changeScheme, onPlay = { playing = true })
+                        TitleScreen(best, bestLevel, onSettings = { showSettings = true }, onPlay = { playing = true })
+                        if (showSettings) {
+                            BackHandler { showSettings = false }
+                            SettingsScreen(
+                                settings = settings,
+                                onChange = changeSettings,
+                                onPreviewSound = feedback::previewSound,
+                                onPreviewVibration = feedback::previewVibration,
+                                onBack = { showSettings = false },
+                            )
+                        }
                     }
                 }
             }
@@ -92,11 +99,6 @@ class MainActivity : ComponentActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) hideSystemBars()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        getSharedPreferences("kaboom", MODE_PRIVATE).edit { putBoolean("sound", feedback.soundOn) }
     }
 
     override fun onDestroy() {
