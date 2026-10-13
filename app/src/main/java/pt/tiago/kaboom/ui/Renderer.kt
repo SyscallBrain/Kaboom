@@ -79,7 +79,7 @@ fun DrawScope.drawGame(g: Game) {
         }
     }
 
-    for (b in g.bombs) drawBomb(b.x * s + s / 2, b.y * s + s / 2, s, 1f - b.timer / Game.FUSE, t)
+    for (b in g.bombs) drawBomb(b.x * s + s / 2, b.y * s + s / 2, s, 1f - b.timer / Game.FUSE, t, age = Game.FUSE - b.timer)
     drawFlames(g, s, t)
     for (e in g.enemies) drawEnemy(e, s, t, g.player.x, g.player.y)
     if (g.phase != Phase.GAME_OVER) drawPlayer(g, s)
@@ -140,8 +140,11 @@ private fun DrawScope.drawBurning(x: Float, y: Float, s: Float, p: Float, t: Flo
     )
 }
 
-fun DrawScope.drawBomb(cx: Float, cy: Float, s: Float, urgency: Float, t: Float) {
-    val pulse = 1f + 0.07f * sin(t * (7f + urgency * 20f))
+fun DrawScope.drawBomb(cx: Float, cy: Float, s: Float, urgency: Float, t: Float, age: Float = 1f) {
+    // Ao ser posta, a bomba "salta" para o chão (easeOutBack)
+    val k = (age / 0.2f).coerceIn(0f, 1f) - 1f
+    val pop = 1f + 2.7f * k * k * k + 1.7f * k * k
+    val pulse = pop * (1f + 0.07f * sin(t * (7f + urgency * 20f)))
     val r = s * 0.34f * pulse
     drawOval(Color.Black.copy(alpha = 0.3f), Offset(cx - r, cy + r * 0.55f), Size(r * 2, r * 0.55f))
     val body = Offset(cx, cy + s * 0.04f)
@@ -294,6 +297,8 @@ private fun DrawScope.drawPlayer(g: Game, s: Float) {
         sc = 1f - k
     }
     if (sc <= 0.01f) return
+    // A piscar enquanto tem o escudo de quem acabou de renascer
+    if (p.invulnerable > 0f && (g.time * 14f).toInt() % 2 == 0) return
     withTransform({
         rotate(rot, c)
         scale(sc, sc, c)
@@ -421,4 +426,24 @@ private fun DrawScope.drawGhost(c: Offset, s: Float, t: Float, look: Offset) {
         val ec = body + Offset(side * s * 0.1f, -s * 0.06f) + look * (s * 0.03f)
         drawOval(Color(0xFF1E1B4B), Offset(ec.x - s * 0.045f, ec.y - s * 0.07f), Size(s * 0.09f, s * 0.14f))
     }
+}
+
+/**
+ * Transição em círculo (como nos jogos antigos): fecha sobre o jogador ao sair do nível
+ * ou ao morrer, e abre a partir dele no início do nível seguinte.
+ */
+fun DrawScope.drawIris(g: Game) {
+    val k = when (g.phase) {
+        Phase.START -> (g.phaseTime / 0.7f).coerceIn(0f, 1f)
+        Phase.LEVEL_CLEAR -> 1f - ((g.phaseTime - 1.3f) / 0.9f).coerceIn(0f, 1f)
+        Phase.DYING -> 1f - ((g.phaseTime - 1.4f) / 0.7f).coerceIn(0f, 1f)
+        else -> 1f
+    }
+    if (k >= 1f) return
+    val s = size.width / Game.W
+    val c = Offset(g.player.x * s, g.player.y * s)
+    val maxR = sqrt(size.width * size.width + size.height * size.height)
+    val r = maxR * k * k
+    val band = maxR * 2f
+    drawCircle(Color.Black, r + band / 2, c, style = Stroke(band))
 }

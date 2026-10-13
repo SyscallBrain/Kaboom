@@ -37,6 +37,9 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -66,7 +69,13 @@ private val bigTitle = TextStyle(
 )
 
 @Composable
-fun TitleScreen(best: Int, bestLevel: Int, onPlay: () -> Unit) {
+fun TitleScreen(
+    best: Int,
+    bestLevel: Int,
+    scheme: ControlScheme,
+    onSchemeChange: (ControlScheme) -> Unit,
+    onPlay: () -> Unit,
+) {
     val anim = rememberInfiniteTransition(label = "title")
     val t by anim.animateFloat(0f, 100f, infiniteRepeatable(tween(100_000, easing = LinearEasing)), label = "t")
     Column(
@@ -97,6 +106,8 @@ fun TitleScreen(best: Int, bestLevel: Int, onPlay: () -> Unit) {
         ) {
             Text("JOGAR", fontSize = 26.sp, fontWeight = FontWeight.Black)
         }
+        Spacer(Modifier.height(12.dp))
+        SchemeButton(scheme, onSchemeChange)
         Spacer(Modifier.height(28.dp))
         if (best > 0) {
             Text("🏆 Recorde: $best", color = Gold, fontSize = 20.sp, fontWeight = FontWeight.Bold)
@@ -120,8 +131,16 @@ private fun Legend(icon: String, text: String) {
 }
 
 @Composable
-fun GameScreen(feedback: Feedback, onGameOver: (score: Int, level: Int) -> Unit, onExit: () -> Unit) {
+fun GameScreen(
+    feedback: Feedback,
+    scheme: ControlScheme,
+    onSchemeChange: (ControlScheme) -> Unit,
+    onGameOver: (score: Int, level: Int) -> Unit,
+    onExit: () -> Unit,
+) {
     val game = remember { Game().apply { newGame() } }
+    val effects = remember { Effects() }
+    val measurer = rememberTextMeasurer()
     var frame by remember { mutableLongStateOf(0L) }
     var paused by remember { mutableStateOf(false) }
     var soundOn by remember { mutableStateOf(feedback.soundOn) }
@@ -141,6 +160,9 @@ fun GameScreen(feedback: Feedback, onGameOver: (score: Int, level: Int) -> Unit,
                     for (e in game.events) feedback.on(e)
                     if (GameEvent.GAME_OVER in game.events) onGameOver(game.score, game.level)
                     game.events.clear()
+                    effects.consume(game.fx)
+                    game.fx.clear()
+                    effects.update(dt)
                 }
                 last = now
                 frame = now
@@ -159,14 +181,21 @@ fun GameScreen(feedback: Feedback, onGameOver: (score: Int, level: Int) -> Unit,
         Column(Modifier.fillMaxSize()) {
             Hud(hud, onPause = { paused = true })
             Box(Modifier.fillMaxWidth().aspectRatio(Game.W.toFloat() / Game.H)) {
-                Canvas(Modifier.fillMaxSize()) {
+                Canvas(Modifier.fillMaxSize().clipToBounds()) {
                     @Suppress("UNUSED_EXPRESSION") frame // redesenha a cada frame
-                    drawGame(game)
+                    val s = size.width / Game.W
+                    val shake = effects.shakeOffset() * s
+                    translate(shake.x, shake.y) {
+                        drawGame(game)
+                        effects.draw(this, s, measurer)
+                    }
+                    drawIris(game)
                 }
                 if (banner != null) Banner(banner.first, banner.second)
             }
             Controls(
                 Modifier.fillMaxWidth().weight(1f).background(Color(0xFF0F172A)),
+                scheme = scheme,
                 onDir = { d: Dir? -> game.input = d },
                 onBomb = { game.requestBomb() },
             )
@@ -179,7 +208,10 @@ fun GameScreen(feedback: Feedback, onGameOver: (score: Int, level: Int) -> Unit,
                 Text("Pontos: ${game.score}", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 Text("Chegaste ao nível ${game.level}", color = Color(0xFFCBD5E1), fontSize = 17.sp)
                 Spacer(Modifier.height(28.dp))
-                BigButton("Jogar outra vez") { game.newGame() }
+                BigButton("Jogar outra vez") {
+                    effects.clear()
+                    game.newGame()
+                }
                 Spacer(Modifier.height(12.dp))
                 OutlinedButton(onClick = onExit, modifier = Modifier.width(240.dp)) { Text("Menu", fontSize = 18.sp) }
             }
@@ -197,10 +229,21 @@ fun GameScreen(feedback: Feedback, onGameOver: (score: Int, level: Int) -> Unit,
                     modifier = Modifier.width(240.dp),
                 ) { Text(if (soundOn) "🔊 Som ligado" else "🔇 Som desligado", fontSize = 18.sp) }
                 Spacer(Modifier.height(12.dp))
+                SchemeButton(scheme, onSchemeChange)
+                Spacer(Modifier.height(12.dp))
                 OutlinedButton(onClick = onExit, modifier = Modifier.width(240.dp)) { Text("Sair para o menu", fontSize = 18.sp) }
             }
         }
     }
+}
+
+/** Alterna entre os esquemas de controlo. */
+@Composable
+private fun SchemeButton(scheme: ControlScheme, onChange: (ControlScheme) -> Unit) {
+    OutlinedButton(
+        onClick = { onChange(ControlScheme.entries[(scheme.ordinal + 1) % ControlScheme.entries.size]) },
+        modifier = Modifier.width(240.dp),
+    ) { Text("🎮 ${scheme.label}", fontSize = 17.sp) }
 }
 
 @Composable

@@ -30,6 +30,11 @@ enum class EnemyKind(val speed: Float, val points: Int, val chase: Float, val gh
 
 enum class Phase { START, PLAYING, DYING, LEVEL_CLEAR, GAME_OVER }
 
+/** Efeitos visuais com posição (em unidades de casa) — partículas, pontos a flutuar, tremor. */
+enum class FxKind { EXPLOSION, BLOCK_BROKEN, ITEM, SCORE }
+
+class Fx(val kind: FxKind, val x: Float, val y: Float, val value: Int = 0)
+
 /** Coisas que aconteceram neste frame — a UI transforma-as em som e vibração. */
 enum class GameEvent { BOMB_PLACED, EXPLOSION, ITEM, ENEMY_DIED, PLAYER_DIED, DOOR_OPEN, LEVEL_CLEAR, GAME_OVER }
 
@@ -71,6 +76,9 @@ class Player {
     /** Distância total percorrida — só serve para animar as pernas. */
     var walk = 0f
     var dying = -1f
+
+    /** > 0: acabou de renascer e os inimigos não lhe tocam (segundos que faltam). */
+    var invulnerable = 0f
     var maxBombs = 1
     var range = 1
     var speedUps = 0

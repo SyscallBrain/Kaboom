@@ -167,6 +167,43 @@ class GameTest {
     }
 
     @Test
+    fun escudoAoRenascerProtegeDosInimigosMasNaoDoFogo() {
+        val g = game(
+            "#######",
+            "#P.E#",
+            "#######",
+        )
+        g.player.invulnerable = 1f
+        g.run(0.5f)
+        assertEquals("inimigo encostado não o mata com escudo", Phase.PLAYING, g.phase)
+        g.run(1f)
+        assertEquals("sem escudo, o inimigo já mata", Phase.DYING, g.phase)
+
+        val f = game(
+            "#####",
+            "#P..#",
+            "#####",
+        )
+        f.player.invulnerable = 99f
+        f.requestBomb()
+        f.run(Game.FUSE + 0.1f)
+        assertEquals(Phase.DYING, f.phase)
+    }
+
+    @Test
+    fun efeitosVisuaisSaoEmitidos() {
+        val g = game(
+            "#######",
+            "#P..B.#",
+            "#######",
+        )
+        g.bombs += Bomb(3, 1, 1).apply { ownerInside = false; timer = 0.01f }
+        g.update(0.02f)
+        assertTrue(g.fx.any { it.kind == FxKind.EXPLOSION && it.x == 3.5f })
+        assertTrue(g.fx.any { it.kind == FxKind.BLOCK_BROKEN && it.x == 4.5f })
+    }
+
+    @Test
     fun apanharItemDaPoder() {
         val g = game(
             "#####",

@@ -45,12 +45,18 @@ class Feedback(context: Context) {
 
     fun on(e: GameEvent) {
         if (soundOn) sounds[e]?.let { pool.play(it, 1f, 1f, 1, 0, 1f) }
+        val v = vibrator ?: return
+        if (e == GameEvent.BOMB_PLACED && Build.VERSION.SDK_INT >= 29) {
+            // Um "clique" curto ao pôr a bomba, para se sentir o botão
+            v.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+            return
+        }
         val ms = when (e) {
-            GameEvent.EXPLOSION -> 40L
+            GameEvent.EXPLOSION -> 45L
             GameEvent.PLAYER_DIED -> 300L
             else -> return
         }
-        vibrator?.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
+        v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
     }
 
     fun release() = pool.release()

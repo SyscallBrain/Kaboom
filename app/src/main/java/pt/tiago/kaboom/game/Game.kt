@@ -24,6 +24,7 @@ class Game(private val rng: Random = Random.Default) {
         const val MAX_BOMBS = 8
         const val MAX_RANGE = 8
         const val MAX_SPEED = 4
+        const val RESPAWN_SHIELD = 2.5f
         private const val EPS = 0.001f
     }
 
@@ -60,6 +61,7 @@ class Game(private val rng: Random = Random.Default) {
     var time = 0f; private set
 
     val events = ArrayList<GameEvent>()
+    val fx = ArrayList<Fx>()
 
     /** Direcção que o jogador está a carregar (null = parado). Escrita pela UI. */
     var input: Dir? = null
@@ -119,6 +121,7 @@ class Game(private val rng: Random = Random.Default) {
         }
         hiddenItems.clear()
         items.clear()
+        fx.clear()
         bombs.clear()
         enemies.clear()
         doorX = -1
@@ -134,6 +137,7 @@ class Game(private val rng: Random = Random.Default) {
         player.facing = Dir.DOWN
         player.dying = -1f
         player.moving = false
+        player.invulnerable = 0f
     }
 
     private fun loadLevel(n: Int) {
@@ -231,6 +235,7 @@ class Game(private val rng: Random = Random.Default) {
             placeBomb()
         }
         p.moving = false
+        if (p.invulnerable > 0f) p.invulnerable = max(0f, p.invulnerable - dt)
         input?.let { d ->
             p.facing = d
             val ox = p.x
@@ -256,6 +261,8 @@ class Game(private val rng: Random = Random.Default) {
             }
             score += 50
             events += GameEvent.ITEM
+            fx += Fx(FxKind.ITEM, p.x, p.y)
+            fx += Fx(FxKind.SCORE, p.x, p.y - 0.3f, 50)
         }
 
         if (doorRevealed && doorOpen && p.cellX == doorX && p.cellY == doorY &&
@@ -343,7 +350,7 @@ class Game(private val rng: Random = Random.Default) {
 
     private fun checkPlayerDeath() {
         val p = player
-        val hitByEnemy = enemies.any { it.alive && abs(it.x - p.x) < 0.7f && abs(it.y - p.y) < 0.7f }
+        val hitByEnemy = p.invulnerable <= 0f && enemies.any { it.alive && abs(it.x - p.x) < 0.7f && abs(it.y - p.y) < 0.7f }
         if (flame[p.cellY][p.cellX] > 0f || hitByEnemy) {
             p.dying = 0f
             p.moving = false
@@ -359,6 +366,7 @@ class Game(private val rng: Random = Random.Default) {
             setPhase(Phase.GAME_OVER)
         } else {
             loadLevel(level)
+            player.invulnerable = RESPAWN_SHIELD
         }
     }
 
@@ -400,6 +408,7 @@ class Game(private val rng: Random = Random.Default) {
                 e.dying = 0f
                 score += e.kind.points
                 events += GameEvent.ENEMY_DIED
+                fx += Fx(FxKind.SCORE, e.x, e.y - 0.3f, e.kind.points)
             }
         }
         enemies.removeAll { it.dying > 1f }
@@ -421,6 +430,7 @@ class Game(private val rng: Random = Random.Default) {
             val b = queue.removeFirst()
             bombs.remove(b)
             ignite(b.x, b.y, h = true, v = true)
+            fx += Fx(FxKind.EXPLOSION, b.x + 0.5f, b.y + 0.5f)
             for (d in Dir.entries) {
                 for (i in 1..b.range) {
                     val x = b.x + d.dx * i
@@ -431,6 +441,7 @@ class Game(private val rng: Random = Random.Default) {
                         if (burn[y][x] <= 0f) {
                             burn[y][x] = BURN
                             score += 10
+                            fx += Fx(FxKind.BLOCK_BROKEN, x + 0.5f, y + 0.5f)
                         }
                         break
                     }

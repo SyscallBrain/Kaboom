@@ -25,6 +25,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import pt.tiago.kaboom.audio.Feedback
+import pt.tiago.kaboom.ui.ControlScheme
 import pt.tiago.kaboom.ui.GameScreen
 import pt.tiago.kaboom.ui.TitleScreen
 
@@ -44,6 +45,16 @@ class MainActivity : ComponentActivity() {
             var playing by remember { mutableStateOf(false) }
             var best by remember { mutableIntStateOf(prefs.getInt("best", 0)) }
             var bestLevel by remember { mutableIntStateOf(prefs.getInt("bestLevel", 0)) }
+            var scheme by remember {
+                mutableStateOf(
+                    ControlScheme.entries.firstOrNull { it.name == prefs.getString("controls", null) }
+                        ?: ControlScheme.DPAD,
+                )
+            }
+            val changeScheme = { c: ControlScheme ->
+                scheme = c
+                prefs.edit { putString("controls", c.name) }
+            }
 
             MaterialTheme(colorScheme = darkColorScheme(primary = Color(0xFFF97316))) {
                 Box(
@@ -55,6 +66,8 @@ class MainActivity : ComponentActivity() {
                     if (playing) {
                         GameScreen(
                             feedback = feedback,
+                            scheme = scheme,
+                            onSchemeChange = changeScheme,
                             onGameOver = { score, level ->
                                 if (score > best) best = score
                                 if (level > bestLevel) bestLevel = level
@@ -69,7 +82,7 @@ class MainActivity : ComponentActivity() {
                             },
                         )
                     } else {
-                        TitleScreen(best, bestLevel, onPlay = { playing = true })
+                        TitleScreen(best, bestLevel, scheme, changeScheme, onPlay = { playing = true })
                     }
                 }
             }
