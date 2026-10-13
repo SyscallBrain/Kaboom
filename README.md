@@ -61,3 +61,8 @@ Precisa do JDK 17 ou superior e do Android SDK com a plataforma 37.
 
 - Tipo de letra [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P), de
   CodeMan38, sob a SIL Open Font License 1.1 (ver `licenses/OFL-PressStart2P.txt`).
+
+## Licença
+
+O código está sob a licença MIT (ver `LICENSE`). O tipo de letra mantém a sua própria
+licença (SIL OFL 1.1).
