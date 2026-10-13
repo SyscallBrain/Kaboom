@@ -36,6 +36,7 @@ enum class Level(val label: String) {
 
 data class Settings(
     val volume: Float = 0.8f,
+    val music: Float = 0.6f,
     val vibration: Level = Level.MEDIUM,
     val shake: Level = Level.MEDIUM,
     val scheme: ControlScheme = ControlScheme.FLOATING,
@@ -44,6 +45,7 @@ data class Settings(
     companion object {
         fun load(p: SharedPreferences) = Settings(
             volume = p.getFloat("volume", if (p.getBoolean("sound", true)) 0.8f else 0f),
+            music = p.getFloat("music", 0.6f),
             vibration = enumOr(p.getString("vibration", null), Level.MEDIUM),
             shake = enumOr(p.getString("shake", null), Level.MEDIUM),
             scheme = enumOr(p.getString("controls", null), ControlScheme.FLOATING),
@@ -56,6 +58,7 @@ data class Settings(
 
     fun save(p: SharedPreferences) = p.edit {
         putFloat("volume", volume)
+        putFloat("music", music)
         putString("vibration", vibration.name)
         putString("shake", shake.name)
         putString("controls", scheme.name)
@@ -85,7 +88,13 @@ fun SettingsScreen(
     ) {
         Text("DEFINIÇÕES", style = pixelTitle(22.sp))
 
-        Section("🔊 Volume do som: ${(settings.volume * 100).toInt()}%") {
+        Section("🎵 Volume da música: ${(settings.music * 100).toInt()}%") {
+            Slider(
+                value = settings.music,
+                onValueChange = { onChange(settings.copy(music = it)) },
+            )
+        }
+        Section("🔊 Volume dos efeitos: ${(settings.volume * 100).toInt()}%") {
             Slider(
                 value = settings.volume,
                 onValueChange = { onChange(settings.copy(volume = it)) },

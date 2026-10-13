@@ -51,6 +51,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import pt.tiago.kaboom.audio.Feedback
+import pt.tiago.kaboom.audio.MusicPlayer
+import pt.tiago.kaboom.audio.Song
 import pt.tiago.kaboom.game.Dir
 import pt.tiago.kaboom.game.EnemyKind
 import pt.tiago.kaboom.game.Game
@@ -224,6 +226,7 @@ private fun Legend(img: ImageBitmap, text: String) {
 fun GameScreen(
     startLevel: Int,
     feedback: Feedback,
+    music: MusicPlayer,
     settings: Settings,
     onSettingsChange: (Settings) -> Unit,
     onGameOver: (score: Int, level: Int) -> Unit,
@@ -276,6 +279,14 @@ fun GameScreen(
     }
     val hud = HudState(game.lives, Levels.title(game.level), p.maxBombs, p.range, p.speedUps, game.score, specials)
     val bossBar = game.boss?.takeIf { !it.defeated }?.let { it.kind.title to it.hp.coerceAtLeast(0) }
+
+    // Música do mundo (ou do boss) enquanto se joga; silêncio ao morrer, ao passar o nível e no fim
+    val song = when (game.phase) {
+        Phase.START, Phase.PLAYING -> if (game.boss != null) Song.BOSS else Song.forWorld(Levels.worldOf(game.level))
+        else -> null
+    }
+    LaunchedEffect(song) { music.play(song) }
+    LaunchedEffect(paused || showSettings) { music.duck(paused || showSettings) }
     val banner = bannerFor(game)
 
     Box(Modifier.fillMaxSize()) {

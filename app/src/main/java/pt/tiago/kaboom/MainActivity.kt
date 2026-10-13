@@ -24,7 +24,10 @@ import androidx.core.content.edit
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.runtime.LaunchedEffect
 import pt.tiago.kaboom.audio.Feedback
+import pt.tiago.kaboom.audio.MusicPlayer
+import pt.tiago.kaboom.audio.Song
 import androidx.activity.compose.BackHandler
 import pt.tiago.kaboom.ui.GameScreen
 import pt.tiago.kaboom.ui.LevelSelectScreen
@@ -37,6 +40,7 @@ private enum class Screen { TITLE, SELECT, GAME }
 
 class MainActivity : ComponentActivity() {
     private lateinit var feedback: Feedback
+    private val music = MusicPlayer()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -58,6 +62,12 @@ class MainActivity : ComponentActivity() {
             var settings by remember { mutableStateOf(Settings.load(prefs)) }
             feedback.volume = settings.volume
             feedback.vibration = settings.vibration
+            LaunchedEffect(settings.music) { music.setVolume(settings.music) }
+            // Fora do jogo toca a música do menu (o GameScreen trata da sua)
+            LaunchedEffect(screen) {
+                if (screen != Screen.GAME) music.play(Song.TITLE)
+                music.duck(false)
+            }
             val changeSettings = { s: Settings ->
                 settings = s
                 s.save(prefs)
@@ -74,6 +84,7 @@ class MainActivity : ComponentActivity() {
                         Screen.GAME -> GameScreen(
                             startLevel = startLevel,
                             feedback = feedback,
+                            music = music,
                             settings = settings,
                             onSettingsChange = changeSettings,
                             onGameOver = { score, level ->
@@ -127,7 +138,18 @@ class MainActivity : ComponentActivity() {
         if (hasFocus) hideSystemBars()
     }
 
+    override fun onPause() {
+        super.onPause()
+        music.suspend()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        music.resume()
+    }
+
     override fun onDestroy() {
+        music.release()
         feedback.release()
         super.onDestroy()
     }
